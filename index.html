@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Documentary Research Assistant</title>
+    <link rel="stylesheet" href="static/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- Password Gate -->
+    <div id="password-gate" class="gate-active">
+      <div class="gate-content">
+        <div class="gate-logo">🎬</div>
+        <h1>Documentary Research Assistant</h1>
+        <p class="gate-subtitle">Elasticsearch-powered interview search</p>
+        <div class="gate-form">
+          <input
+            type="password"
+            id="password-input"
+            placeholder="Enter password..."
+            autofocus
+          />
+          <button id="password-submit" class="btn-primary">Enter</button>
+          <p id="password-error" class="error-message" style="display: none">
+            Incorrect password
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" style="display: none">
+      <!-- Header -->
+      <header class="app-header">
+        <div class="header-left">
+          <span class="logo">🎬</span>
+          <h1>Research Assistant</h1>
+          <span class="beta-badge">BETA</span>
+        </div>
+        <div class="header-right">
+          <button
+            id="new-chat-btn"
+            class="btn-secondary"
+            title="New Chat (Cmd/Ctrl+N)"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            New Chat
+          </button>
+          <button
+            id="export-btn"
+            class="btn-secondary"
+            title="Export Conversation"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export
+          </button>
+          <button id="settings-btn" class="btn-icon" title="Settings">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="3"></circle>
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+              ></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="app-container">
+        <!-- Sidebar with Tabs -->
+        <aside class="sidebar">
+          <div class="sidebar-header">
+            <h2>Conversations</h2>
+          </div>
+          <div id="chat-tabs" class="chat-tabs">
+            <!-- Tabs will be generated here -->
+          </div>
+          <div class="sidebar-footer">
+            <button id="clear-all-btn" class="btn-text">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path
+                  d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                ></path>
+              </svg>
+              Clear All
+            </button>
+          </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-container">
+          <div id="messages" class="messages">
+            <div class="welcome-message">
+              <div class="welcome-icon">🎬</div>
+              <h2>Welcome to Documentary Research Assistant</h2>
+              <p>
+                Search through your interview transcripts using natural
+                language.
+              </p>
+              <div class="example-queries">
+                <p>Try asking:</p>
+                <div class="examples">
+                  <button class="example-btn" data-query="wrestling experience">
+                    "wrestling experience"
+                  </button>
+                  <button class="example-btn" data-query="Thailand and Pattaya">
+                    "Thailand and Pattaya"
+                  </button>
+                  <button class="example-btn" data-query="career sacrifices">
+                    "career sacrifices"
+                  </button>
+                  <button class="example-btn" data-query="Wam Bam character">
+                    "Wam Bam character"
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="input-area">
+            <div class="input-row">
+              <select
+                id="model-selector"
+                class="model-selector"
+                title="Select AI Model"
+              >
+                <option value="anthropic/claude-3.5-sonnet">
+                  Claude 3.5 Sonnet
+                </option>
+                <option value="anthropic/claude-3.5-haiku">
+                  Claude 3.5 Haiku
+                </option>
+                <option value="openai/gpt-4o">GPT-4o</option>
+                <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+                <option value="google/gemini-flash-1.5">
+                  Gemini Flash 1.5
+                </option>
+                <option value="google/gemini-pro-1.5">Gemini Pro 1.5</option>
+              </select>
+              <button
+                id="search-mode-btn"
+                class="btn-toggle active"
+                title="Search Mode"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <path d="m21 21-4.35-4.35"></path>
+                </svg>
+                Search
+              </button>
+            </div>
+            <div class="input-container">
+              <textarea
+                id="message-input"
+                placeholder="Ask about your interviews... (Cmd/Ctrl+Enter to send)"
+                rows="1"
+                maxlength="2000"
+              ></textarea>
+              <div class="input-actions">
+                <span id="char-count">0/2000</span>
+                <button id="send-btn" class="btn-send" disabled>
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Settings</h3>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="setting-row">
+            <label for="worker-url">Worker URL</label>
+            <input
+              type="url"
+              id="worker-url"
+              placeholder="https://your-worker.your-subdomain.workers.dev"
+            />
+            <small>The URL of your deployed Cloudflare Worker</small>
+          </div>
+          <div class="setting-row">
+            <label for="es-index">Elasticsearch Index</label>
+            <input
+              type="text"
+              id="es-index"
+              value="subtitles"
+              placeholder="subtitles"
+            />
+            <small>The name of your Elasticsearch index</small>
+          </div>
+          <div class="setting-row">
+            <label for="temperature">Temperature</label>
+            <input
+              type="range"
+              id="temperature"
+              min="0"
+              max="1"
+              step="0.1"
+              value="0.7"
+            />
+            <span id="temp-value">0.7</span>
+            <small>Lower = more focused, Higher = more creative</small>
+          </div>
+          <div class="setting-row">
+            <label for="result-size">Max Search Results</label>
+            <input
+              type="number"
+              id="result-size"
+              value="50"
+              min="10"
+              max="100"
+            />
+            <small>Number of documents to retrieve from Elasticsearch</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="save-settings" class="btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="export-modal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Export Conversation</h3>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>Choose export format:</p>
+          <div class="export-options">
+            <button class="export-btn" data-format="markdown">
+              <span class="export-icon">📝</span>
+              <span class="export-name">Markdown</span>
+              <span class="export-desc">Formatted text with headers</span>
+            </button>
+            <button class="export-btn" data-format="json">
+              <span class="export-icon">📊</span>
+              <span class="export-name">JSON</span>
+              <span class="export-desc">Raw conversation data</span>
+            </button>
+            <button class="export-btn" data-format="text">
+              <span class="export-icon">📄</span>
+              <span class="export-name">Plain Text</span>
+              <span class="export-desc">Simple text format</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <script src="static/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+# Cloudflare Worker Configuration
+name = "documentary-research-assistant"
+main = "worker/index.js"
+compatibility_date = "2024-01-01"
+
+[env.production.vars]
+# These are set via wrangler secret commands (not shown here for security)
+# ELASTICSEARCH_ENDPOINT = ""
+# ELASTICSEARCH_API_KEY = ""
+# OPENROUTER_API_KEY = ""
+
+# Routes configuration - customize with your domain
+# [[env.production.routes]]
+# pattern = "api.yourdomain.com/*"
+# custom_domain = true
+
+# Development settings
+[env.development]
+name = "documentary-research-assistant-dev"
