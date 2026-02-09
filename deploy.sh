@@ -21,8 +21,8 @@ fi
 
 # Check if wrangler is installed
 if ! command -v wrangler &> /dev/null; then
-    echo "❌ wrangler is not installed. Installing with npx..."
-    echo "   (You can also install globally: npm install -g wrangler)"
+    echo "📦 Installing wrangler..."
+    npm install -g wrangler
 fi
 
 # Check if user is logged in
