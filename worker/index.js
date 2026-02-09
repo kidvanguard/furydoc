@@ -37,9 +37,18 @@ EXAMPLE:
 If the query is "career sacrifices" and transcript shows relevant content at "Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760", your output should be:
 - Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760: "quote about sacrifices here"
 
-STRICT RELEVANCE CHECK: Before including any quote, ask yourself: "Does this quote ACTUALLY discuss the query topic, or is it just from a document that matched the search?" If it's not directly about the topic, DO NOT INCLUDE IT.
+STRICT RELEVANCE CHECK: Before including any quote, ask yourself: "Does this quote ACTUALLY discuss the query topic?" 
 
-REMEMBER: Quality over quantity. Only include quotes that are actually about the query topic.`;
+EXCLUDE these even if from matching documents:
+- Weather reports (rain, flooding)
+- Event logistics (show postponed, setup issues)
+- Bio introductions ("I'm the founder", "My name is")
+- Generic career summaries without sacrifice details
+- Technical problems (sound checks, equipment)
+
+ONLY INCLUDE quotes that specifically discuss: sacrifices made, hardships endured, things given up, challenges overcome for the career.
+
+REMEMBER: Quality over quantity. A few highly relevant quotes are better than many irrelevant ones.`;
 
 export default {
   async fetch(request, env, ctx) {
