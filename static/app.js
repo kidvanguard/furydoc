@@ -669,7 +669,10 @@ function extractFilename(hit) {
 
 // Helper function to extract timestamp range from VTT/SRT content
 function extractTimestamp(content) {
-  if (!content) return "";
+  if (!content) {
+    console.log("[DEBUG] extractTimestamp: no content provided");
+    return "";
+  }
 
   // Look for VTT/SRT timestamp pattern: 00:00:00,000 --> 00:00:00,000
   const timestampMatch = content.match(
@@ -679,15 +682,19 @@ function extractTimestamp(content) {
     // Format as "00:00:00 – 00:00:00" (using en-dash)
     const start = timestampMatch[1].replace(",", ".");
     const end = timestampMatch[2].replace(",", ".");
-    return `${start} – ${end}`;
+    const result = `${start} – ${end}`;
+    console.log("[DEBUG] extractTimestamp found:", result);
+    return result;
   }
 
   // Try simple time pattern if no range found
   const simpleMatch = content.match(/(\d{2}:\d{2}:\d{2})/);
   if (simpleMatch) {
+    console.log("[DEBUG] extractTimestamp simple match:", simpleMatch[1]);
     return simpleMatch[1];
   }
 
+  console.log("[DEBUG] extractTimestamp: no timestamp found in content");
   return "";
 }
 
@@ -723,7 +730,11 @@ function buildPromptWithResults(query, searchResults) {
         const content = hit.content || hit.text || "";
         const exactFilename = extractFilename(hit);
         // Extract timestamp from content if not in field
-        const timestamp = hit.timestamp || extractTimestamp(content);
+        const extractedTs = extractTimestamp(content);
+        const timestamp = hit.timestamp || extractedTs;
+        console.log(
+          `[DEBUG] Timestamp for ${exactFilename}: hit.timestamp="${hit.timestamp}", extracted="${extractedTs}", final="${timestamp}"`,
+        );
         // More content - 1000 chars to find better quotes
         const truncatedContent =
           content.length > 1000 ? content.slice(0, 1000) + "..." : content;
