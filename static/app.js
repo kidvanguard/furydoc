@@ -8,7 +8,7 @@ const CONFIG = {
   // Default settings
   DEFAULT_WORKER_URL: "", // User will set this
   DEFAULT_ES_INDEX: "subtitles",
-  DEFAULT_MODEL: "anthropic/claude-3.5-sonnet",
+  DEFAULT_MODEL: "deepseek/deepseek-chat",
   DEFAULT_TEMPERATURE: 0.7,
   DEFAULT_RESULT_SIZE: 50,
 
@@ -106,9 +106,21 @@ function setupEventListeners() {
   elements.sendBtn.addEventListener("click", sendMessage);
   elements.messageInput.addEventListener("input", handleInput);
   elements.messageInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    // Send on Enter (without shift for new line)
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
       sendMessage();
     }
+  });
+
+  // Search mode toggle
+  elements.searchModeBtn.addEventListener("click", () => {
+    elements.searchModeBtn.classList.toggle("active");
+    const isActive = elements.searchModeBtn.classList.contains("active");
+    showToast(
+      isActive ? "Search mode enabled" : "Search mode disabled",
+      "info",
+    );
   });
 
   // Settings
@@ -419,7 +431,9 @@ function buildPromptWithResults(query, searchResults) {
       const truncatedContent =
         content.length > 500 ? content.slice(0, 500) + "..." : content;
 
-      prompt += `[${index + 1}] File: ${hit.filename}\n`;
+      // Ensure filename is preserved exactly as in the .txt file
+      const exactFilename = hit.filename || hit.source || "unknown.txt";
+      prompt += `[${index + 1}] Source File: "${exactFilename}"\n`;
       if (hit.timestamp) prompt += `Time: ${hit.timestamp}\n`;
       if (hit.speaker) prompt += `Speaker: ${hit.speaker}\n`;
       prompt += `Content: ${truncatedContent}\n\n`;

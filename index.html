@@ -164,18 +164,21 @@
                 class="model-selector"
                 title="Select AI Model"
               >
-                <option value="anthropic/claude-3.5-sonnet">
-                  Claude 3.5 Sonnet
+                <option value="deepseek/deepseek-chat" selected>
+                  DeepSeek V3 🇨🇳 (Cheap + Reasoning)
+                </option>
+                <option value="google/gemini-flash-1.5">
+                  Gemini Flash 1.5 (Fast & Cheap)
                 </option>
                 <option value="anthropic/claude-3.5-haiku">
-                  Claude 3.5 Haiku
+                  Claude 3.5 Haiku (Balanced)
                 </option>
-                <option value="openai/gpt-4o">GPT-4o</option>
-                <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
-                <option value="google/gemini-flash-1.5">
-                  Gemini Flash 1.5
+                <option value="openai/gpt-4o-mini">
+                  GPT-4o Mini (Reliable)
                 </option>
-                <option value="google/gemini-pro-1.5">Gemini Pro 1.5</option>
+                <option value="qwen/qwen-2.5-72b-instruct">
+                  Qwen 2.5 72B 🇨🇳 (Alibaba - Smart)
+                </option>
               </select>
               <button
                 id="search-mode-btn"
@@ -199,7 +202,7 @@
             <div class="input-container">
               <textarea
                 id="message-input"
-                placeholder="Ask about your interviews... (Cmd/Ctrl+Enter to send)"
+                placeholder="Ask about your interviews... (Press Enter to send)"
                 rows="1"
                 maxlength="2000"
               ></textarea>
