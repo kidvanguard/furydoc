@@ -101,12 +101,12 @@ async function handleSearch(request, env) {
       );
     }
 
-    // Build Elasticsearch query
+    // Build Elasticsearch query - furytranscripts uses attachment.content
     const esQuery = {
       query: {
         multi_match: {
           query: query,
-          fields: ["content^3", "text^3", "filename", "speaker"],
+          fields: ["attachment.content^3", "filename", "speaker"],
           type: "best_fields",
           fuzziness: "AUTO",
         },
@@ -114,8 +114,7 @@ async function handleSearch(request, env) {
       size: size,
       highlight: {
         fields: {
-          content: {},
-          text: {},
+          "attachment.content": {},
         },
       },
     };
@@ -148,10 +147,14 @@ async function handleSearch(request, env) {
 
     const data = await response.json();
 
-    // Format results
+    // Format results - furytranscripts uses attachment.content
     const hits = data.hits.hits.map((hit) => ({
       filename: hit._source.filename || "Unknown",
-      content: hit._source.content || hit._source.text || "",
+      content:
+        hit._source.attachment?.content ||
+        hit._source.content ||
+        hit._source.text ||
+        "",
       timestamp: hit._source.timestamp || hit._source.start_time || "",
       speaker: hit._source.speaker || "",
       score: hit._score,

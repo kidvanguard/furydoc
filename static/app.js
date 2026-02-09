@@ -8,7 +8,7 @@ const CONFIG = {
   // Default settings
   DEFAULT_WORKER_URL:
     "https://documentary-research-assistant.furydoc.workers.dev",
-  DEFAULT_ES_INDEX: "subtitles",
+  DEFAULT_ES_INDEX: "furytranscripts",
   DEFAULT_MODEL: "deepseek/deepseek-chat",
   DEFAULT_TEMPERATURE: 0.7,
   DEFAULT_RESULT_SIZE: 50,
