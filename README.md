@@ -76,7 +76,7 @@ git push -u origin main
 ### 3. Configure the App
 
 1. Open your deployed GitHub Pages site
-2. Enter password: `documentary2024`
+2. Enter password
 3. Click ⚙️ Settings button
 4. Paste your Worker URL
 5. Set your Elasticsearch index name (default: `subtitles`)
