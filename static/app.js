@@ -650,6 +650,7 @@ async function regenerateResponse(index) {
 // Settings
 function loadSettings() {
   const saved = localStorage.getItem(CONFIG.SETTINGS_KEY);
+  console.log("Loading settings from localStorage:", saved);
   state.settings = saved
     ? JSON.parse(saved)
     : {
@@ -659,8 +660,10 @@ function loadSettings() {
         resultSize: CONFIG.DEFAULT_RESULT_SIZE,
       };
 
+  console.log("Loaded settings:", state.settings);
   // Apply to inputs
   elements.workerUrlInput.value = state.settings.workerUrl || "";
+  console.log("Set worker URL input to:", elements.workerUrlInput.value);
   elements.esIndexInput.value =
     state.settings.esIndex || CONFIG.DEFAULT_ES_INDEX;
   elements.temperatureInput.value =
