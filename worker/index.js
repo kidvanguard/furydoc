@@ -72,7 +72,11 @@ export default {
 
 async function handleSearch(request, env) {
   try {
-    const { query, index = "subtitles", size = 50 } = await request.json();
+    const {
+      query,
+      index = "furytranscripts",
+      size = 50,
+    } = await request.json();
 
     if (!query) {
       return new Response(JSON.stringify({ error: "Query required" }), {
