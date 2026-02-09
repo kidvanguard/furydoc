@@ -388,6 +388,7 @@ function getRelatedSearches(query) {
 }
 
 async function planSearches(query) {
+  console.log("[DEBUG] planSearches called with query:", query);
   // Ask LLM to plan what searches to run
   const planPrompt = `You are a documentary researcher. The user wants to find: "${query}"
 
@@ -410,6 +411,7 @@ Example response for "career sacrifices":
 Now respond with JSON array for: "${query}"`;
 
   try {
+    console.log("[DEBUG] Sending plan request to LLM...");
     const response = await fetch(`${state.settings.workerUrl}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -439,6 +441,7 @@ Now respond with JSON array for: "${query}"`;
 
 async function sendMessage() {
   const content = elements.messageInput.value.trim();
+  console.log("[DEBUG] sendMessage called with:", content);
   if (!content || state.isLoading) return;
 
   // Check if worker URL is configured
@@ -485,16 +488,18 @@ async function sendMessage() {
     // Step 1: Ask LLM to plan the searches
     showToast("Planning searches with AI...", "info");
     const plannedSearches = await planSearches(content);
+    console.log("[DEBUG] Planned searches:", plannedSearches);
 
     // Also get related searches from our predefined list
     const relatedSearches = getRelatedSearches(content);
+    console.log("[DEBUG] Related searches:", relatedSearches);
 
     // Combine and deduplicate
     const allSearches = [
       ...new Set([content, ...plannedSearches, ...relatedSearches]),
     ];
 
-    console.log("Running searches:", allSearches);
+    console.log("[DEBUG] Running searches:", allSearches);
     showToast(`Running ${allSearches.length} searches...`, "info");
 
     // Step 2: Run all searches
@@ -502,25 +507,46 @@ async function sendMessage() {
     const seenFiles = new Set();
 
     for (const searchTerm of allSearches) {
+      console.log(`[DEBUG] Searching: "${searchTerm}"`);
       try {
         const results = await searchElasticsearch(searchTerm);
-        for (const hit of results.hits) {
+        console.log(
+          `[DEBUG] Found ${results.hits?.length || 0} hits for "${searchTerm}"`,
+        );
+        for (const hit of results.hits || []) {
           if (!seenFiles.has(hit.filename)) {
             seenFiles.add(hit.filename);
             allResults.hits.push(hit);
             allResults.total++;
+          } else {
+            console.log(`[DEBUG] Skipping duplicate file: ${hit.filename}`);
           }
         }
       } catch (e) {
-        console.error(`Search failed for "${searchTerm}":`, e);
+        console.error(`[DEBUG] Search failed for "${searchTerm}":`, e);
       }
     }
 
-    console.log(`Found ${allResults.total} unique results`);
+    console.log(`[DEBUG] Total unique results: ${allResults.total}`);
+    console.log(
+      "[DEBUG] Files found:",
+      allResults.hits.map((h) => h.filename),
+    );
     showToast(`Found ${allResults.total} clips, analyzing...`, "info");
 
     // Step 3: Send to OpenRouter for final organization
+    const promptPreview = buildPromptWithResults(content, allResults).slice(
+      0,
+      500,
+    );
+    console.log("[DEBUG] Prompt preview (first 500 chars):", promptPreview);
+
     const response = await sendToOpenRouter(content, allResults);
+    console.log("[DEBUG] LLM response length:", response.length);
+    console.log(
+      "[DEBUG] LLM response preview (first 500 chars):",
+      response.slice(0, 500),
+    );
 
     // Add assistant message
     const assistantMessage = {
@@ -541,7 +567,7 @@ async function sendMessage() {
     saveChats();
     renderMessages();
   } catch (error) {
-    console.error("Error:", error);
+    console.error("[DEBUG] Error in sendMessage:", error);
     showToast(`Error: ${error.message}`, "error");
 
     // Remove user message on error
