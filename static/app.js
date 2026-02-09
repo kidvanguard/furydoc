@@ -40,15 +40,12 @@ document.addEventListener("DOMContentLoaded", () => {
   checkAuth();
   setupEventListeners();
   setupKeyboardShortcuts();
-
+  
   // Set default model
   elements.modelSelector.value = CONFIG.DEFAULT_MODEL;
 });
 
 function initElements() {
-  elements = {
-    // Password gate
-    passwordGate: document.getElementById("password-gate"),
     passwordInput: document.getElementById("password-input"),
     passwordSubmit: document.getElementById("password-submit"),
     passwordError: document.getElementById("password-error"),

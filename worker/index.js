@@ -39,11 +39,11 @@ export default {
 
     try {
       if (path === "/api/search" && request.method === "POST") {
-        return handleSearch(request, env);
+        return await handleSearch(request, env);
       }
 
       if (path === "/api/chat" && request.method === "POST") {
-        return handleChat(request, env);
+        return await handleChat(request, env);
       }
 
       if (path === "/api/models" && request.method === "GET") {
@@ -56,154 +56,229 @@ export default {
       });
     } catch (error) {
       console.error("Worker error:", error);
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: {
-          ...CORS_HEADERS,
-          "Content-Type": "application/json",
+      return new Response(
+        JSON.stringify({ error: error.message, stack: error.stack }),
+        {
+          status: 500,
+          headers: {
+            ...CORS_HEADERS,
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
     }
   },
 };
 
 async function handleSearch(request, env) {
-  const { query, index = "subtitles", size = 50 } = await request.json();
+  try {
+    const { query, index = "subtitles", size = 50 } = await request.json();
 
-  if (!query) {
-    return new Response(JSON.stringify({ error: "Query required" }), {
-      status: 400,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-    });
-  }
+    if (!query) {
+      return new Response(JSON.stringify({ error: "Query required" }), {
+        status: 400,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
 
-  // Build Elasticsearch query
-  const esQuery = {
-    query: {
-      multi_match: {
-        query: query,
-        fields: ["content^3", "text^3", "filename", "speaker"],
-        type: "best_fields",
-        fuzziness: "AUTO",
+    // Check if env vars are set
+    if (!env.ELASTICSEARCH_ENDPOINT) {
+      return new Response(
+        JSON.stringify({ error: "ELASTICSEARCH_ENDPOINT not configured" }),
+        {
+          status: 500,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
+    }
+    if (!env.ELASTICSEARCH_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "ELASTICSEARCH_API_KEY not configured" }),
+        {
+          status: 500,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Build Elasticsearch query
+    const esQuery = {
+      query: {
+        multi_match: {
+          query: query,
+          fields: ["content^3", "text^3", "filename", "speaker"],
+          type: "best_fields",
+          fuzziness: "AUTO",
+        },
       },
-    },
-    size: size,
-    highlight: {
-      fields: {
-        content: {},
-        text: {},
+      size: size,
+      highlight: {
+        fields: {
+          content: {},
+          text: {},
+        },
       },
-    },
-  };
+    };
 
-  const response = await fetch(
-    `${env.ELASTICSEARCH_ENDPOINT}/${index}/_search`,
-    {
+    const esUrl = `${env.ELASTICSEARCH_ENDPOINT}/${index}/_search`;
+    console.log("Searching Elasticsearch:", esUrl);
+
+    const response = await fetch(esUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `ApiKey ${env.ELASTICSEARCH_API_KEY}`,
       },
       body: JSON.stringify(esQuery),
-    },
-  );
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Elasticsearch error: ${response.status} - ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Elasticsearch error:", response.status, errorText);
+      return new Response(
+        JSON.stringify({
+          error: `Elasticsearch error: ${response.status} - ${errorText}`,
+        }),
+        {
+          status: 500,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const data = await response.json();
+
+    // Format results
+    const hits = data.hits.hits.map((hit) => ({
+      filename: hit._source.filename || "Unknown",
+      content: hit._source.content || hit._source.text || "",
+      timestamp: hit._source.timestamp || hit._source.start_time || "",
+      speaker: hit._source.speaker || "",
+      score: hit._score,
+      highlights: hit.highlight,
+    }));
+
+    return new Response(
+      JSON.stringify({
+        hits: hits,
+        total: data.hits.total?.value || data.hits.total || 0,
+        query: query,
+      }),
+      {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      },
+    );
+  } catch (error) {
+    console.error("handleSearch error:", error);
+    return new Response(
+      JSON.stringify({ error: error.message, stack: error.stack }),
+      {
+        status: 500,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      },
+    );
   }
-
-  const data = await response.json();
-
-  // Format results
-  const hits = data.hits.hits.map((hit) => ({
-    filename: hit._source.filename || "Unknown",
-    content: hit._source.content || hit._source.text || "",
-    timestamp: hit._source.timestamp || hit._source.start_time || "",
-    speaker: hit._source.speaker || "",
-    score: hit._score,
-    highlights: hit.highlight,
-  }));
-
-  return new Response(
-    JSON.stringify({
-      hits: hits,
-      total: data.hits.total.value,
-      query: query,
-    }),
-    {
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-    },
-  );
 }
 
 async function handleChat(request, env) {
-  const {
-    messages,
-    model = "anthropic/claude-3.5-sonnet",
-    temperature = 0.7,
-  } = await request.json();
+  try {
+    const {
+      messages,
+      model = "anthropic/claude-3.5-sonnet",
+      temperature = 0.7,
+    } = await request.json();
 
-  if (!messages || !Array.isArray(messages)) {
-    return new Response(JSON.stringify({ error: "Messages array required" }), {
-      status: 400,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-    });
-  }
-
-  // Construct system message with timecode agent prompt
-  const systemMessage = {
-    role: "system",
-    content: TIMECODE_AGENT_PROMPT,
-  };
-
-  // Extract search results from the last user message if present
-  const lastMessage = messages[messages.length - 1];
-  let conversationMessages = [systemMessage];
-
-  // Add conversation history (skipping the system message pattern)
-  for (const msg of messages) {
-    if (msg.role !== "system") {
-      conversationMessages.push(msg);
+    if (!messages || !Array.isArray(messages)) {
+      return new Response(
+        JSON.stringify({ error: "Messages array required" }),
+        {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
     }
-  }
 
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-        "HTTP-Referer": "https://github.com",
-        "X-Title": "Documentary Research Assistant",
+    if (!env.OPENROUTER_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "OPENROUTER_API_KEY not configured" }),
+        {
+          status: 500,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Construct system message with timecode agent prompt
+    const systemMessage = {
+      role: "system",
+      content: TIMECODE_AGENT_PROMPT,
+    };
+
+    // Extract search results from the last user message if present
+    let conversationMessages = [systemMessage];
+
+    // Add conversation history (skipping the system message pattern)
+    for (const msg of messages) {
+      if (msg.role !== "system") {
+        conversationMessages.push(msg);
+      }
+    }
+
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+          "HTTP-Referer": "https://github.com",
+          "X-Title": "Documentary Research Assistant",
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: conversationMessages,
+          temperature: temperature,
+          max_tokens: 4000,
+        }),
       },
-      body: JSON.stringify({
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("OpenRouter error:", response.status, errorText);
+      return new Response(
+        JSON.stringify({
+          error: `OpenRouter error: ${response.status} - ${errorText}`,
+        }),
+        {
+          status: 500,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const data = await response.json();
+
+    return new Response(
+      JSON.stringify({
+        content: data.choices[0].message.content,
         model: model,
-        messages: conversationMessages,
-        temperature: temperature,
-        max_tokens: 4000,
+        usage: data.usage,
       }),
-    },
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenRouter error: ${response.status} - ${errorText}`);
+      {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      },
+    );
+  } catch (error) {
+    console.error("handleChat error:", error);
+    return new Response(
+      JSON.stringify({ error: error.message, stack: error.stack }),
+      {
+        status: 500,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      },
+    );
   }
-
-  const data = await response.json();
-
-  return new Response(
-    JSON.stringify({
-      content: data.choices[0].message.content,
-      model: model,
-      usage: data.usage,
-    }),
-    {
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-    },
-  );
 }
 
 async function handleGetModels(env) {
