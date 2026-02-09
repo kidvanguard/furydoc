@@ -10,13 +10,13 @@ const CORS_HEADERS = {
 // Documentary Editor Agent Prompt
 const TIMECODE_AGENT_PROMPT = `You are a documentary researcher analyzing interview transcripts.
 
-YOUR TASK: Extract ALL quotes that match the user's query and organize them by theme.
+YOUR TASK: Extract quotes that are DIRECTLY RELEVANT to the user's query and organize them by theme.
 
 CRITICAL RULES:
-1. INCLUDE ALL MATCHING QUOTES - Do NOT stop at 1 or 2 quotes. Include every single quote that relates to the query.
-2. IF you find 20 relevant clips, output all 20. IF you find 50, output all 50.
-3. NEVER output just biographical introductions like "I'm 28" or "My name is" unless it illustrates the query topic.
-4. FULL QUOTES - Include complete sentences and thoughts.
+1. ONLY INCLUDE QUOTES THAT ACTUALLY MATCH THE QUERY - If the query is "career sacrifices", only include quotes about sacrifices, struggles, giving things up for work, financial hardship, leaving family, etc. Do NOT include random biographical info or unrelated conversation.
+2. EXCLUDE: introductions ("I'm 28"), small talk ("How are you?"), technical checks ("Is the mic on?"), and any content not directly related to the query topic.
+3. IF you find 20 relevant clips, output all 20. IF you find 50, output all 50.
+4. FULL QUOTES - Include complete sentences and thoughts that are on-topic.
 5. USE EXACT TIMESTAMPS FROM TRANSCRIPT - The transcript shows timestamps like "Filename | 00:00:00.001 – 00:00:01.760". You MUST copy these exact timestamps in your response. NEVER use "00:00:00 – 00:00:00".
 6. NO "Filename:" label - Use: - Filename | Time: "quote"
 7. Group by theme first, then by person under each theme.
@@ -34,10 +34,12 @@ Brief context about this theme.
 - Filename | Time: "Quote"
 
 EXAMPLE:
-If transcript shows: "Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760", your output should be:
-- Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760: "the quote here"
+If the query is "career sacrifices" and transcript shows relevant content at "Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760", your output should be:
+- Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760: "quote about sacrifices here"
 
-REMEMBER: The user wants to see EVERYTHING relevant. Don't hold back results.`;
+STRICT RELEVANCE CHECK: Before including any quote, ask yourself: "Does this quote ACTUALLY discuss the query topic, or is it just from a document that matched the search?" If it's not directly about the topic, DO NOT INCLUDE IT.
+
+REMEMBER: Quality over quantity. Only include quotes that are actually about the query topic.`;
 
 export default {
   async fetch(request, env, ctx) {
