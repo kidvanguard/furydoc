@@ -8,59 +8,31 @@ const CORS_HEADERS = {
 };
 
 // Documentary Editor Agent Prompt
-const TIMECODE_AGENT_PROMPT = `EXTRACT QUOTES FROM TRANSCRIPTS AND ORGANIZE BY THEMES WITH CONTEXT.
+const TIMECODE_AGENT_PROMPT = `You are a documentary researcher analyzing interview transcripts.
 
-OUTPUT FORMAT - GROUP BY THEME THEN BY PERSON:
+YOUR TASK: Extract ALL quotes that match the user's query and organize them by theme.
 
-### Theme Name (e.g., Financial Sacrifices, Leaving Home, Physical Toll)
-Brief context about what this theme represents.
+CRITICAL RULES:
+1. INCLUDE ALL MATCHING QUOTES - Do NOT stop at 1 or 2 quotes. Include every single quote that relates to the query.
+2. IF you find 20 relevant clips, output all 20. IF you find 50, output all 50.
+3. NEVER output just biographical introductions like "I'm 28" or "My name is" unless it illustrates the query topic.
+4. FULL QUOTES - Include complete sentences and thoughts.
+5. NO "Filename:" label - Use: - Filename | Time: "quote"
+6. Group by theme first, then by person under each theme.
+
+OUTPUT FORMAT:
+
+### Theme Name
+Brief context about this theme.
 
 **Person Name**
-- Filename | Time: "Full quote here"
-- Filename | Time: "Another quote"
+- Filename | Time: "Full quote"
+- Filename | Time: "Another quote from same person"
 
 **Another Person**
-- Filename | Time: "Quote about this theme"
-
-### Another Theme
-Context for this theme.
-
-**Person Name**
 - Filename | Time: "Quote"
 
-RULES:
-1. GROUP BY THEME FIRST - Create 3-5 thematic sections (Financial, Family, Physical, Relocation, etc.)
-2. ADD CONTEXT - Write 1-2 sentences explaining each theme
-3. THEN GROUP BY PERSON - Under each theme, list people with their quotes
-4. SKIP INTRODUCTIONS - "Hi my name is", "I'm 28" - NOT sacrifices
-5. FULL SENTENCES - Include complete thoughts
-6. NO "Filename:" WORD - Just: - Shivam Interview | 00:00:01: "quote"
-7. MANY RESULTS - Include all relevant quotes
-
-EXAMPLE FOR "CAREER SACRIFICES":
-
-### Leaving Everything Behind
-Wrestlers who relocated to Thailand, leaving family, jobs, and familiar lives.
-
-**Shivam**
-- Shivam Interview A Roll | 00:00:10 – 00:00:25: "I left my family back home, gave up my job, moved across the world just to wrestle here"
-
-**Wam Bam Bellows**
-- Wam Bam Interview A Roll | 00:00:49 – 00:00:59: "Started training in 2004... in 2014 I started going overseas for traveling and wrestling"
-
-### Financial Struggles
-The economic reality of pursuing wrestling without stable income.
-
-**Shivam**
-- Shivam Interview A Roll | 00:01:15 – 00:01:30: "The hardest part is the money, you know? Sometimes I don't know how I'm gonna eat but I keep training"
-
-### Building the Scene (Organizational Challenges)
-The struggle to establish wrestling in a new country with limited resources.
-
-**Sunny**
-- Sunny can't find wrestlers | 00:00:05 – 00:00:20: "My biggest struggle is finding wrestlers right now. I train in Canada, at least every school has so many students"
-
-FILTER: Skip biographical info (name, age, where from) unless it illustrates a sacrifice`;
+REMEMBER: The user wants to see EVERYTHING relevant. Don't hold back results.`;
 
 export default {
   async fetch(request, env, ctx) {
