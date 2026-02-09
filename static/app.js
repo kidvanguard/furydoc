@@ -514,9 +514,22 @@ async function sendMessage() {
           `[DEBUG] Found ${results.hits?.length || 0} hits for "${searchTerm}"`,
         );
         for (const hit of results.hits || []) {
-          // Get filename from multiple possible fields (same logic as buildPromptWithResults)
-          const filename =
-            hit.filename || hit.source || hit._source?.filename || "unknown";
+          // Extract filename from hit - check field first, then extract from content
+          let filename = hit.filename || "unknown";
+          if (!filename || filename === "Unknown" || filename === "unknown") {
+            // Try to extract from content (format: "Filename: Name\n\n" or "Name\n\n1\n")
+            const content = hit.content || hit.text || "";
+            const filenameMatch = content.match(/Filename:\s*([^\n]+)/i);
+            if (filenameMatch) {
+              filename = filenameMatch[1].trim();
+            } else {
+              // Try first non-empty line before timestamp
+              const lines = content.split("\n").filter((l) => l.trim());
+              if (lines.length > 0 && !lines[0].match(/^\d+\s*$/)) {
+                filename = lines[0].trim();
+              }
+            }
+          }
           if (!seenFiles.has(filename)) {
             seenFiles.add(filename);
             allResults.hits.push(hit);
@@ -636,6 +649,24 @@ async function sendToOpenRouter(query, searchResults) {
   return data.content;
 }
 
+// Helper function to extract filename from hit
+function extractFilename(hit) {
+  let filename = hit.filename || "unknown";
+  if (!filename || filename === "Unknown" || filename === "unknown") {
+    const content = hit.content || hit.text || "";
+    const filenameMatch = content.match(/Filename:\s*([^\n]+)/i);
+    if (filenameMatch) {
+      filename = filenameMatch[1].trim();
+    } else {
+      const lines = content.split("\n").filter((l) => l.trim());
+      if (lines.length > 0 && !lines[0].match(/^\d+\s*$/)) {
+        filename = lines[0].trim();
+      }
+    }
+  }
+  return filename;
+}
+
 function buildPromptWithResults(query, searchResults) {
   let prompt = `QUERY: ${query}\n\n`;
   prompt += `INSTRUCTIONS FOR CHATBOT:\n`;
@@ -648,7 +679,7 @@ function buildPromptWithResults(query, searchResults) {
     // Group by person first to help the LLM
     const personGroups = {};
     searchResults.hits.forEach((hit) => {
-      const exactFilename = hit.filename || hit.source || "unknown.txt";
+      const exactFilename = extractFilename(hit);
       const speakerMatch = exactFilename.match(
         /^(\w+)\s+(?:Interview|talking|tours?|hosting|outside|at|with|can't)/i,
       );
@@ -666,7 +697,7 @@ function buildPromptWithResults(query, searchResults) {
       prompt += `--- ${speaker} ---\n`;
       hits.forEach((hit, idx) => {
         const content = hit.content || hit.text || "";
-        const exactFilename = hit.filename || hit.source || "unknown.txt";
+        const exactFilename = extractFilename(hit);
         // More content - 1000 chars to find better quotes
         const truncatedContent =
           content.length > 1000 ? content.slice(0, 1000) + "..." : content;
