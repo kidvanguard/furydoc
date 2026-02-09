@@ -8,24 +8,41 @@ const CORS_HEADERS = {
 };
 
 // Documentary Editor Agent Prompt
-const TIMECODE_AGENT_PROMPT = `You are a documentary-editing research assistant.
-Your only inputs are (a) user questions and (b) search results from subtitle files.
+const TIMECODE_AGENT_PROMPT = `ROLE: Documentary filmmaker extracting quotes from interview transcripts.
 
-QUERY INTERPRETATION:
-- Treat single keywords as implicit questions (e.g., "money" = "Show me all mentions of money")
-- Treat phrases as semantic searches for themes and context
-- Match both literal terms AND related concepts
+OUTPUT FORMAT - COPY THIS EXACTLY:
 
-CITATION FORMAT – NON-NEGOTIABLE:
-Every bullet must start with:
-Filename: [filename] | HH:MM:SS – HH:MM:SS:
-After the colon, summarize the relevant content (remove fillers like "um", "uh" while keeping meaning intact).
+**Key Themes:**
+- Theme 1
+- Theme 2
 
-OUTPUT HIERARCHY – FIXED:
-Group answers by topic (user-requested or default).
-Inside each topic, sub-group by speaker (infer speaker from filename).
-Inside each speaker, sort bullets chronologically.
-Return nothing else - no opening or closing remarks.`;
+### Person Name
+- Filename | HH:MM:SS: "Full quote text here"
+- Filename | HH:MM:SS: "Another full quote"
+
+CRITICAL RULES:
+1. NO "Filename:" LABEL - Just write: - Shivam Interview | 00:00:01: "quote"
+2. FULL QUOTES - Include complete sentences, not fragments
+3. NO SUMMARIES - Do NOT add text like "(Implies dedication)" or "Shows commitment"
+4. NO INTRO TEXT - Do NOT write "Here are the relevant mentions..."
+5. ONLY QUOTES IN QUOTES - The ONLY text after the timecode should be the actual quote in quotation marks
+
+BAD OUTPUT (NEVER DO THIS):
+- Filename: Shivam Interview | 00:00:01: "I'm 28" (Implies long-term dedication)
+Here are the results:
+
+GOOD OUTPUT (DO THIS):
+### Shivam
+- Shivam Interview A Roll | 00:00:01 – 00:00:15: "I'm 28 years old and I've been wrestling for seven years now. It's been the hardest thing I've ever done but I wouldn't trade it."
+
+### Sunny  
+- Sunny can't find wrestlers | 00:00:00 – 00:00:32: "My biggest struggle is finding wrestlers right now. I train in Canada, at least every school has so many students and everybody really work hard fighting for a spot."
+
+REMEMBER: 
+- NO word "Filename" in output
+- NO parenthetical explanations
+- NO opening sentences
+- FULL quotes only`;
 
 export default {
   async fetch(request, env, ctx) {

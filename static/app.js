@@ -71,7 +71,6 @@ function initElements() {
     sendBtn: document.getElementById("send-btn"),
     charCount: document.getElementById("char-count"),
     modelSelector: document.getElementById("model-selector"),
-    searchModeBtn: document.getElementById("search-mode-btn"),
 
     // Settings modal
     settingsModal: document.getElementById("settings-modal"),
@@ -120,16 +119,6 @@ function setupEventListeners() {
       e.preventDefault();
       sendMessage();
     }
-  });
-
-  // Search mode toggle
-  elements.searchModeBtn.addEventListener("click", () => {
-    elements.searchModeBtn.classList.toggle("active");
-    const isActive = elements.searchModeBtn.classList.contains("active");
-    showToast(
-      isActive ? "Search mode enabled" : "Search mode disabled",
-      "info",
-    );
   });
 
   // Settings
@@ -430,26 +419,47 @@ async function sendToOpenRouter(query, searchResults) {
 }
 
 function buildPromptWithResults(query, searchResults) {
-  let prompt = `User Question: ${query}\n\n`;
+  let prompt = `QUERY: ${query}\n\n`;
+  prompt += `INSTRUCTIONS FOR CHATBOT:\n`;
+  prompt += `- Extract quotes relevant to: ${query}\n`;
+  prompt += `- Use format: - Filename | Time: "Full quote here"\n`;
+  prompt += `- NO "Filename:" label, NO summaries in parentheses\n`;
+  prompt += `- Include full sentences, not fragments\n\n`;
 
   if (searchResults.hits && searchResults.hits.length > 0) {
-    prompt += `Search Results (${searchResults.total} total matches):\n\n`;
-
-    searchResults.hits.forEach((hit, index) => {
-      const content = hit.content || hit.text || "";
-      const truncatedContent =
-        content.length > 500 ? content.slice(0, 500) + "..." : content;
-
-      // Ensure filename is preserved exactly as in the .txt file
+    // Group by person first to help the LLM
+    const personGroups = {};
+    searchResults.hits.forEach((hit) => {
       const exactFilename = hit.filename || hit.source || "unknown.txt";
-      prompt += `[${index + 1}] Source File: "${exactFilename}"\n`;
-      if (hit.timestamp) prompt += `Time: ${hit.timestamp}\n`;
-      if (hit.speaker) prompt += `Speaker: ${hit.speaker}\n`;
-      prompt += `Content: ${truncatedContent}\n\n`;
+      const speakerMatch = exactFilename.match(
+        /^(\w+)\s+(?:Interview|talking|tours?|hosting|outside|at|with|can't)/i,
+      );
+      const speaker = speakerMatch ? speakerMatch[1] : hit.speaker || "Unknown";
+
+      if (!personGroups[speaker]) {
+        personGroups[speaker] = [];
+      }
+      personGroups[speaker].push(hit);
+    });
+
+    prompt += `TRANSCRIPT CONTENT:\n\n`;
+
+    Object.entries(personGroups).forEach(([speaker, hits]) => {
+      prompt += `--- ${speaker} ---\n`;
+      hits.forEach((hit, idx) => {
+        const content = hit.content || hit.text || "";
+        const exactFilename = hit.filename || hit.source || "unknown.txt";
+        // More content - 1000 chars to find better quotes
+        const truncatedContent =
+          content.length > 1000 ? content.slice(0, 1000) + "..." : content;
+
+        prompt += `${exactFilename}`;
+        if (hit.timestamp) prompt += ` | ${hit.timestamp}`;
+        prompt += `\n${truncatedContent}\n\n`;
+      });
     });
   } else {
-    prompt +=
-      "No search results found. Please inform the user that no matches were found in the interview transcripts.\n";
+    prompt += "No search results found.\n";
   }
 
   return prompt;
@@ -803,23 +813,62 @@ function formatTime(timestamp) {
 }
 
 function formatMessage(content) {
-  // Escape HTML
-  let formatted = escapeHtml(content);
+  // First handle markdown before escaping HTML
+  let formatted = content;
 
-  // Convert URLs to links
+  // Convert headers (####, ###, ##, #) - MUST process longer patterns first
   formatted = formatted.replace(
-    /(https?:\/\/[^\s]+)/g,
-    '<a href="$1" target="_blank" rel="noopener" style="color: var(--color-accent); text-decoration: underline;">$1</a>',
+    /^####\s*(.+)$/gim,
+    '<h4 style="margin: 12px 0 8px 0; color: var(--color-text); font-size: 1.1em;">$1</h4>',
+  );
+  formatted = formatted.replace(
+    /^###\s*(.+)$/gim,
+    '<h3 style="margin: 16px 0 8px 0; color: var(--color-text); border-bottom: 1px solid var(--color-border); padding-bottom: 4px; font-size: 1.2em;">$1</h3>',
+  );
+  formatted = formatted.replace(
+    /^##\s*(.+)$/gim,
+    '<h2 style="margin: 20px 0 10px 0; color: var(--color-text); font-size: 1.4em;">$1</h2>',
+  );
+  formatted = formatted.replace(
+    /^#\s*(.+)$/gim,
+    '<h1 style="margin: 24px 0 12px 0; color: var(--color-text); font-size: 1.6em;">$1</h1>',
   );
 
   // Convert **bold** to <strong>
   formatted = formatted.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 
-  // Convert *italic* to <em>
-  formatted = formatted.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  // Convert list items (- or *) at start of line to list items
+  // Handle both standalone lines and lines after headers
+  formatted = formatted.replace(/^[\*\-]\s+(.+)$/gm, "<li>$1</li>");
 
-  // Convert `code` to <code>
-  formatted = formatted.replace(/`(.+?)`/g, "<code>$1</code>");
+  // Wrap consecutive li elements in ul
+  formatted = formatted.replace(
+    /(<li>.+<\/li>(?:\s|<br>)*)/g,
+    "<ul style='margin: 8px 0; padding-left: 20px;'>$1</ul>",
+  );
+
+  // Now escape HTML in remaining text (not in tags we just created)
+  // Split by HTML tags and escape text between them
+  const parts = formatted.split(/(<[^>]+>)/g);
+  formatted = parts
+    .map((part, i) => {
+      if (i % 2 === 0) {
+        // Text content - escape it
+        return escapeHtml(part);
+      }
+      // HTML tag - keep as is
+      return part;
+    })
+    .join("");
+
+  // Convert URLs to links (after escaping)
+  formatted = formatted.replace(
+    /(https?:\/\/[^\s<]+)/g,
+    '<a href="$1" target="_blank" rel="noopener" style="color: var(--color-accent); text-decoration: underline;">$1</a>',
+  );
+
+  // Convert newlines to <br> for remaining text
+  formatted = formatted.replace(/\n/g, "<br>");
 
   return formatted;
 }
