@@ -39,16 +39,30 @@ If the query is "career sacrifices" and transcript shows relevant content at "Sh
 
 STRICT RELEVANCE CHECK: Before including any quote, ask yourself: "Does this quote ACTUALLY discuss the query topic?" 
 
+FOR "career sacrifices" ONLY INCLUDE quotes about:
+- Financial struggles, debt, low pay
+- Leaving family/home behind
+- Physical pain, injuries from training
+- Giving up stable jobs/opportunities
+- Working long hours without rest
+- Moving countries for wrestling
+- Family not understanding/supporting the career
+- Missing important life events for wrestling
+
 EXCLUDE these even if from matching documents:
 - Weather reports (rain, flooding)
 - Event logistics (show postponed, setup issues)
 - Bio introductions ("I'm the founder", "My name is")
 - Generic career summaries without sacrifice details
 - Technical problems (sound checks, equipment)
+- Goals and ambitions ("I want to wrestle in WWE")
+- Match descriptions/injuries during shows
+- Audience experience descriptions
+- Complaints about minor inconveniences
 
-ONLY INCLUDE quotes that specifically discuss: sacrifices made, hardships endured, things given up, challenges overcome for the career.
+WHEN IN DOUBT, LEAVE IT OUT. A shorter list of highly relevant quotes is better than a long list with irrelevant filler.
 
-REMEMBER: Quality over quantity. A few highly relevant quotes are better than many irrelevant ones.`;
+REMEMBER: The user wants quality documentary clips about sacrifices, not random quotes from wrestlers.`;
 
 export default {
   async fetch(request, env, ctx) {
