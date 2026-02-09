@@ -40,6 +40,9 @@ document.addEventListener("DOMContentLoaded", () => {
   checkAuth();
   setupEventListeners();
   setupKeyboardShortcuts();
+
+  // Set default model
+  elements.modelSelector.value = CONFIG.DEFAULT_MODEL;
 });
 
 function initElements() {
@@ -657,18 +660,28 @@ async function regenerateResponse(index) {
 function loadSettings() {
   const saved = localStorage.getItem(CONFIG.SETTINGS_KEY);
   console.log("Loading settings from localStorage:", saved);
-  state.settings = saved
-    ? JSON.parse(saved)
-    : {
-        workerUrl: CONFIG.DEFAULT_WORKER_URL,
-        esIndex: CONFIG.DEFAULT_ES_INDEX,
-        temperature: CONFIG.DEFAULT_TEMPERATURE,
-        resultSize: CONFIG.DEFAULT_RESULT_SIZE,
-      };
+
+  // Always start with defaults
+  state.settings = {
+    workerUrl: CONFIG.DEFAULT_WORKER_URL,
+    esIndex: CONFIG.DEFAULT_ES_INDEX,
+    temperature: CONFIG.DEFAULT_TEMPERATURE,
+    resultSize: CONFIG.DEFAULT_RESULT_SIZE,
+  };
+
+  // Merge saved settings (only if they have values)
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    if (parsed.workerUrl) state.settings.workerUrl = parsed.workerUrl;
+    if (parsed.esIndex) state.settings.esIndex = parsed.esIndex;
+    if (parsed.temperature !== undefined)
+      state.settings.temperature = parsed.temperature;
+    if (parsed.resultSize) state.settings.resultSize = parsed.resultSize;
+  }
 
   console.log("Loaded settings:", state.settings);
   // Apply to inputs
-  elements.workerUrlInput.value = state.settings.workerUrl || "";
+  elements.workerUrlInput.value = state.settings.workerUrl;
   console.log("Set worker URL input to:", elements.workerUrlInput.value);
   elements.esIndexInput.value =
     state.settings.esIndex || CONFIG.DEFAULT_ES_INDEX;
