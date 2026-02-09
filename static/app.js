@@ -667,6 +667,30 @@ function extractFilename(hit) {
   return filename;
 }
 
+// Helper function to extract timestamp range from VTT/SRT content
+function extractTimestamp(content) {
+  if (!content) return "";
+
+  // Look for VTT/SRT timestamp pattern: 00:00:00,000 --> 00:00:00,000
+  const timestampMatch = content.match(
+    /(\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,.]\d{3})/,
+  );
+  if (timestampMatch) {
+    // Format as "00:00:00 – 00:00:00" (using en-dash)
+    const start = timestampMatch[1].replace(",", ".");
+    const end = timestampMatch[2].replace(",", ".");
+    return `${start} – ${end}`;
+  }
+
+  // Try simple time pattern if no range found
+  const simpleMatch = content.match(/(\d{2}:\d{2}:\d{2})/);
+  if (simpleMatch) {
+    return simpleMatch[1];
+  }
+
+  return "";
+}
+
 function buildPromptWithResults(query, searchResults) {
   let prompt = `QUERY: ${query}\n\n`;
   prompt += `INSTRUCTIONS FOR CHATBOT:\n`;
@@ -698,12 +722,14 @@ function buildPromptWithResults(query, searchResults) {
       hits.forEach((hit, idx) => {
         const content = hit.content || hit.text || "";
         const exactFilename = extractFilename(hit);
+        // Extract timestamp from content if not in field
+        const timestamp = hit.timestamp || extractTimestamp(content);
         // More content - 1000 chars to find better quotes
         const truncatedContent =
           content.length > 1000 ? content.slice(0, 1000) + "..." : content;
 
         prompt += `${exactFilename}`;
-        if (hit.timestamp) prompt += ` | ${hit.timestamp}`;
+        if (timestamp) prompt += ` | ${timestamp}`;
         prompt += `\n${truncatedContent}\n\n`;
       });
     });
