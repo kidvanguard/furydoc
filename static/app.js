@@ -11,7 +11,7 @@ const CONFIG = {
   DEFAULT_ES_INDEX: "furytranscripts",
   DEFAULT_MODEL: "deepseek/deepseek-chat",
   DEFAULT_TEMPERATURE: 0.7,
-  DEFAULT_RESULT_SIZE: 50,
+  DEFAULT_RESULT_SIZE: 100,
 
   // Local storage keys
   STORAGE_KEY: "docu-research-chats",
@@ -282,6 +282,161 @@ function handleInput() {
     Math.min(elements.messageInput.scrollHeight, 200) + "px";
 }
 
+// Define related search themes for proactive searching
+const THEME_SEARCHES = {
+  "career sacrifices": [
+    "money financial",
+    "family wife husband",
+    "left home moved",
+    "struggle hard difficult",
+    "training physical pain",
+    "job work quit",
+  ],
+  sacrifices: [
+    "money financial",
+    "family wife husband",
+    "left home moved",
+    "struggle hard difficult",
+    "training physical pain",
+    "job work quit",
+  ],
+  money: ["financial debt cost", "pay rent eat", "broke struggle", "job work"],
+  financial: ["money pay", "debt cost", "broke struggle", "job work income"],
+  family: [
+    "wife husband partner",
+    "parents mother father",
+    "kids children",
+    "relationship",
+  ],
+  wife: ["husband partner", "family", "relationship", "home"],
+  husband: ["wife partner", "family", "relationship", "home"],
+  struggle: [
+    "hard difficult challenge",
+    "problem obstacle",
+    "money financial",
+    "physical pain injury",
+  ],
+  thailand: ["bangkok", "pattaya", "moved here", "living here", "asia"],
+  pattaya: ["thailand", "bangkok", "living here", "moved here"],
+  bangkok: ["thailand", "pattaya", "living here", "moved here"],
+  training: ["gym workout", "practice", "physical pain", "learning"],
+  wrestling: ["wrestler", "match", "fight", "training", "promotion"],
+  character: ["personality", "who is", "background", "story"],
+  personality: ["character", "who is", "background", "story"],
+  experience: ["background", "history", "journey", "story"],
+  journey: ["experience", "background", "came here", "started"],
+  "why wrestling": ["dream", "passion", "love", "why", "reason"],
+  dream: ["passion", "goal", "want to", "ambition"],
+  passion: ["dream", "love", "why", "obsession"],
+  "first match": ["debut", "started", "beginning", "nervous"],
+  debut: ["first match", "started", "beginning"],
+  future: ["plan", "goal", "want to", "next"],
+  plan: ["future", "goal", "want to", "next"],
+  goal: ["future", "plan", "want to", "dream"],
+  nervous: ["scared", "afraid", "first time", "worry"],
+  scared: ["nervous", "afraid", "fear", "worry"],
+  travel: ["flew", "came here", "international", "different country"],
+  international: ["travel", "overseas", "different country", "came here"],
+  home: ["family", "wife", "husband", "left", "back home"],
+};
+
+function getRelatedSearches(query) {
+  const lowerQuery = query.toLowerCase();
+
+  // Check for exact matches first
+  for (const [key, searches] of Object.entries(THEME_SEARCHES)) {
+    if (lowerQuery.includes(key)) {
+      return searches;
+    }
+  }
+
+  // For any other query, do intelligent expansions based on keywords
+  const expansions = [];
+
+  // Check for common keywords and add relevant expansions
+  if (lowerQuery.match(/\b(wrestle|fight|match|ring|show)\b/)) {
+    expansions.push("training", "gym", "match", "promotion");
+  }
+  if (lowerQuery.match(/\b(come|came|move|moved|travel|here)\b/)) {
+    expansions.push("thailand", "pattaya", "bangkok", "moved here");
+  }
+  if (lowerQuery.match(/\b(feel|think|believe|opinion)\b/)) {
+    expansions.push("passion", "dream", "love", "why");
+  }
+  if (lowerQuery.match(/\b(hard|difficult|tough|struggle|problem)\b/)) {
+    expansions.push("struggle", "challenge", "money", "financial");
+  }
+  if (lowerQuery.match(/\b(wife|husband|family|home|kid)\b/)) {
+    expansions.push("family", "wife", "husband", "left home");
+  }
+  if (lowerQuery.match(/\b(money|pay|cost|debt|broke)\b/)) {
+    expansions.push("financial", "money", "job", "work");
+  }
+  if (lowerQuery.match(/\b(start|begin|first|started)\b/)) {
+    expansions.push("first match", "debut", "training", "began");
+  }
+  if (lowerQuery.match(/\b(future|plan|goal|next|want)\b/)) {
+    expansions.push("future", "plan", "goal", "dream");
+  }
+
+  // If no specific expansions found, add some general ones
+  if (expansions.length === 0) {
+    return ["experience", "background", "story", "journey"];
+  }
+
+  return [...new Set(expansions)]; // Remove duplicates
+}
+
+async function planSearches(query) {
+  // Ask LLM to plan what searches to run
+  const planPrompt = `You are a documentary researcher. The user wants to find: "${query}"
+
+Your task: Determine what search terms would find the best material for this request.
+
+For example:
+- "trailer moments" → exciting, dramatic, emotional highlights
+- "career sacrifices" → money, family, leaving home, struggles
+- "funny moments" → jokes, laughs, humorous stories
+- "character introductions" → who they are, background, personality
+
+Respond with ONLY a JSON array of 4-8 search terms. Be specific and varied.
+
+Example response for "trailer moments":
+["dramatic exciting", "emotional touching", "fighting action", "victory celebration", "struggle overcome", "dream passion", "never give up", "epic moment"]
+
+Example response for "career sacrifices":
+["money financial", "left family home", "struggle hard", "physical pain injury", "quit job", "training sacrifice", "moved to thailand", "debt broke"]
+
+Now respond with JSON array for: "${query}"`;
+
+  try {
+    const response = await fetch(`${state.settings.workerUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: planPrompt }],
+        model: elements.modelSelector.value,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    const content = data.content || "";
+
+    // Extract JSON array from response
+    const match = content.match(/\[[^\]]+\]/);
+    if (match) {
+      return JSON.parse(match[0]);
+    }
+    return [];
+  } catch (e) {
+    console.error("Search planning failed:", e);
+    return [];
+  }
+}
+
 async function sendMessage() {
   const content = elements.messageInput.value.trim();
   if (!content || state.isLoading) return;
@@ -327,11 +482,45 @@ async function sendMessage() {
   showThinking();
 
   try {
-    // Step 1: Search Elasticsearch
-    const searchResults = await searchElasticsearch(content);
+    // Step 1: Ask LLM to plan the searches
+    showToast("Planning searches with AI...", "info");
+    const plannedSearches = await planSearches(content);
 
-    // Step 2: Send to OpenRouter with context
-    const response = await sendToOpenRouter(content, searchResults);
+    // Also get related searches from our predefined list
+    const relatedSearches = getRelatedSearches(content);
+
+    // Combine and deduplicate
+    const allSearches = [
+      ...new Set([content, ...plannedSearches, ...relatedSearches]),
+    ];
+
+    console.log("Running searches:", allSearches);
+    showToast(`Running ${allSearches.length} searches...`, "info");
+
+    // Step 2: Run all searches
+    const allResults = { hits: [], total: 0 };
+    const seenFiles = new Set();
+
+    for (const searchTerm of allSearches) {
+      try {
+        const results = await searchElasticsearch(searchTerm);
+        for (const hit of results.hits) {
+          if (!seenFiles.has(hit.filename)) {
+            seenFiles.add(hit.filename);
+            allResults.hits.push(hit);
+            allResults.total++;
+          }
+        }
+      } catch (e) {
+        console.error(`Search failed for "${searchTerm}":`, e);
+      }
+    }
+
+    console.log(`Found ${allResults.total} unique results`);
+    showToast(`Found ${allResults.total} clips, analyzing...`, "info");
+
+    // Step 3: Send to OpenRouter for final organization
+    const response = await sendToOpenRouter(content, allResults);
 
     // Add assistant message
     const assistantMessage = {

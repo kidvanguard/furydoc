@@ -8,41 +8,59 @@ const CORS_HEADERS = {
 };
 
 // Documentary Editor Agent Prompt
-const TIMECODE_AGENT_PROMPT = `ROLE: Documentary filmmaker extracting quotes from interview transcripts.
+const TIMECODE_AGENT_PROMPT = `EXTRACT QUOTES FROM TRANSCRIPTS AND ORGANIZE BY THEMES WITH CONTEXT.
 
-OUTPUT FORMAT - COPY THIS EXACTLY:
+OUTPUT FORMAT - GROUP BY THEME THEN BY PERSON:
 
-**Key Themes:**
-- Theme 1
-- Theme 2
+### Theme Name (e.g., Financial Sacrifices, Leaving Home, Physical Toll)
+Brief context about what this theme represents.
 
-### Person Name
-- Filename | HH:MM:SS: "Full quote text here"
-- Filename | HH:MM:SS: "Another full quote"
+**Person Name**
+- Filename | Time: "Full quote here"
+- Filename | Time: "Another quote"
 
-CRITICAL RULES:
-1. NO "Filename:" LABEL - Just write: - Shivam Interview | 00:00:01: "quote"
-2. FULL QUOTES - Include complete sentences, not fragments
-3. NO SUMMARIES - Do NOT add text like "(Implies dedication)" or "Shows commitment"
-4. NO INTRO TEXT - Do NOT write "Here are the relevant mentions..."
-5. ONLY QUOTES IN QUOTES - The ONLY text after the timecode should be the actual quote in quotation marks
+**Another Person**
+- Filename | Time: "Quote about this theme"
 
-BAD OUTPUT (NEVER DO THIS):
-- Filename: Shivam Interview | 00:00:01: "I'm 28" (Implies long-term dedication)
-Here are the results:
+### Another Theme
+Context for this theme.
 
-GOOD OUTPUT (DO THIS):
-### Shivam
-- Shivam Interview A Roll | 00:00:01 – 00:00:15: "I'm 28 years old and I've been wrestling for seven years now. It's been the hardest thing I've ever done but I wouldn't trade it."
+**Person Name**
+- Filename | Time: "Quote"
 
-### Sunny  
-- Sunny can't find wrestlers | 00:00:00 – 00:00:32: "My biggest struggle is finding wrestlers right now. I train in Canada, at least every school has so many students and everybody really work hard fighting for a spot."
+RULES:
+1. GROUP BY THEME FIRST - Create 3-5 thematic sections (Financial, Family, Physical, Relocation, etc.)
+2. ADD CONTEXT - Write 1-2 sentences explaining each theme
+3. THEN GROUP BY PERSON - Under each theme, list people with their quotes
+4. SKIP INTRODUCTIONS - "Hi my name is", "I'm 28" - NOT sacrifices
+5. FULL SENTENCES - Include complete thoughts
+6. NO "Filename:" WORD - Just: - Shivam Interview | 00:00:01: "quote"
+7. MANY RESULTS - Include all relevant quotes
 
-REMEMBER: 
-- NO word "Filename" in output
-- NO parenthetical explanations
-- NO opening sentences
-- FULL quotes only`;
+EXAMPLE FOR "CAREER SACRIFICES":
+
+### Leaving Everything Behind
+Wrestlers who relocated to Thailand, leaving family, jobs, and familiar lives.
+
+**Shivam**
+- Shivam Interview A Roll | 00:00:10 – 00:00:25: "I left my family back home, gave up my job, moved across the world just to wrestle here"
+
+**Wam Bam Bellows**
+- Wam Bam Interview A Roll | 00:00:49 – 00:00:59: "Started training in 2004... in 2014 I started going overseas for traveling and wrestling"
+
+### Financial Struggles
+The economic reality of pursuing wrestling without stable income.
+
+**Shivam**
+- Shivam Interview A Roll | 00:01:15 – 00:01:30: "The hardest part is the money, you know? Sometimes I don't know how I'm gonna eat but I keep training"
+
+### Building the Scene (Organizational Challenges)
+The struggle to establish wrestling in a new country with limited resources.
+
+**Sunny**
+- Sunny can't find wrestlers | 00:00:05 – 00:00:20: "My biggest struggle is finding wrestlers right now. I train in Canada, at least every school has so many students"
+
+FILTER: Skip biographical info (name, age, where from) unless it illustrates a sacrifice`;
 
 export default {
   async fetch(request, env, ctx) {
