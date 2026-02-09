@@ -17,8 +17,9 @@ CRITICAL RULES:
 2. IF you find 20 relevant clips, output all 20. IF you find 50, output all 50.
 3. NEVER output just biographical introductions like "I'm 28" or "My name is" unless it illustrates the query topic.
 4. FULL QUOTES - Include complete sentences and thoughts.
-5. NO "Filename:" label - Use: - Filename | Time: "quote"
-6. Group by theme first, then by person under each theme.
+5. USE EXACT TIMESTAMPS FROM TRANSCRIPT - The transcript shows timestamps like "Filename | 00:00:00.001 – 00:00:01.760". You MUST copy these exact timestamps in your response. NEVER use "00:00:00 – 00:00:00".
+6. NO "Filename:" label - Use: - Filename | Time: "quote"
+7. Group by theme first, then by person under each theme.
 
 OUTPUT FORMAT:
 
@@ -31,6 +32,10 @@ Brief context about this theme.
 
 **Another Person**
 - Filename | Time: "Quote"
+
+EXAMPLE:
+If transcript shows: "Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760", your output should be:
+- Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760: "the quote here"
 
 REMEMBER: The user wants to see EVERYTHING relevant. Don't hold back results.`;
 
