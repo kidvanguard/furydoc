@@ -514,12 +514,15 @@ async function sendMessage() {
           `[DEBUG] Found ${results.hits?.length || 0} hits for "${searchTerm}"`,
         );
         for (const hit of results.hits || []) {
-          if (!seenFiles.has(hit.filename)) {
-            seenFiles.add(hit.filename);
+          // Get filename from multiple possible fields (same logic as buildPromptWithResults)
+          const filename =
+            hit.filename || hit.source || hit._source?.filename || "unknown";
+          if (!seenFiles.has(filename)) {
+            seenFiles.add(filename);
             allResults.hits.push(hit);
             allResults.total++;
           } else {
-            console.log(`[DEBUG] Skipping duplicate file: ${hit.filename}`);
+            console.log(`[DEBUG] Skipping duplicate file: ${filename}`);
           }
         }
       } catch (e) {
