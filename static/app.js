@@ -4,6 +4,9 @@
 import {
   getPlanSearchesPrompt,
   buildResultsAnalysisPrompt,
+  estimateTokens,
+  chunkSearchResults,
+  buildChunkCombinationPrompt,
 } from "../shared/prompts.js";
 
 const CONFIG = {
@@ -17,6 +20,10 @@ const CONFIG = {
   DEFAULT_MODEL: "deepseek/deepseek-chat",
   DEFAULT_TEMPERATURE: 0.7,
   DEFAULT_RESULT_SIZE: 100,
+
+  // Token limits for chunking
+  MAX_TOKENS_PER_REQUEST: 140000, // Leave room for system prompt (~10k) and output (~10k)
+  SAFE_CHUNK_SIZE: 120000, // Process chunks of this size
 
   // Local storage keys
   STORAGE_KEY: "docu-research-chats",
@@ -863,12 +870,71 @@ async function fetchFullDocument(filename) {
 }
 
 async function sendToOpenRouter(query, searchResults) {
+  // Build the full prompt to check token count
+  const fullPrompt = buildPromptWithResults(query, searchResults);
+  const estimatedTokens = estimateTokens(fullPrompt);
+
+  console.log(`[DEBUG] Estimated tokens in prompt: ${estimatedTokens}`);
+
+  // If prompt is within limits, send as-is
+  if (estimatedTokens <= CONFIG.MAX_TOKENS_PER_REQUEST) {
+    console.log(
+      "[DEBUG] Prompt within token limits, sending as single request",
+    );
+    return await sendSingleRequest(query, searchResults);
+  }
+
+  // Otherwise, chunk the search results
+  console.log("[DEBUG] Prompt exceeds token limits, using chunked processing");
+  showToast(
+    `Content is large (${estimatedTokens.toLocaleString()} tokens). Processing in chunks...`,
+    "info",
+  );
+
+  // Chunk the search results
+  const chunks = chunkSearchResults(searchResults, CONFIG.SAFE_CHUNK_SIZE);
+  console.log(`[DEBUG] Split into ${chunks.length} chunks`);
+
+  // Process each chunk
+  const chunkResults = [];
+  for (let i = 0; i < chunks.length; i++) {
+    showToast(`Processing chunk ${i + 1} of ${chunks.length}...`, "info");
+    console.log(`[DEBUG] Processing chunk ${i + 1}/${chunks.length}`);
+
+    const chunkPrompt = buildPromptWithResults(query, chunks[i]);
+    const chunkResponse = await sendSingleRequestWithPrompt(chunkPrompt);
+    chunkResults.push(chunkResponse);
+  }
+
+  // If only one chunk, return it directly
+  if (chunkResults.length === 1) {
+    return chunkResults[0];
+  }
+
+  // Combine chunk results
+  showToast("Combining results from all chunks...", "info");
+  console.log("[DEBUG] Combining chunk results");
+
+  const combinationPrompt = buildChunkCombinationPrompt(
+    query,
+    chunkResults,
+    chunks.length,
+  );
+  return await sendSingleRequestWithPrompt(combinationPrompt);
+}
+
+async function sendSingleRequest(query, searchResults) {
+  const prompt = buildPromptWithResults(query, searchResults);
+  return await sendSingleRequestWithPrompt(prompt);
+}
+
+async function sendSingleRequestWithPrompt(prompt) {
   // Build conversation context
   const messages = [
     ...state.currentMessages.slice(0, -1), // Previous messages (excluding the one we just added)
     {
       role: "user",
-      content: buildPromptWithResults(query, searchResults),
+      content: prompt,
     },
   ];
 

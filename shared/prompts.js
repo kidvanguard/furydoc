@@ -1,4 +1,4 @@
-view; // Shared prompts for Documentary Research Assistant
+// Shared prompts for Documentary Research Assistant
 // This file is imported by both the worker and frontend
 
 /**
@@ -277,6 +277,149 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
   } else {
     prompt += "No search results found.\n";
   }
+
+  return prompt;
+}
+
+// Token and chunking utilities for handling long documents
+
+/**
+ * Estimates token count from character count
+ * Rough estimate: 1 token ≈ 4 characters for English text
+ */
+export function estimateTokens(text) {
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Splits content into chunks that fit within token limits
+ * @param {string} content - The content to chunk
+ * @param {number} maxTokensPerChunk - Maximum tokens per chunk (default 100k to leave room for system prompt and output)
+ * @param {number} overlapTokens - Overlap between chunks to maintain context (default 2k)
+ * @returns {string[]} Array of content chunks
+ */
+export function chunkContent(
+  content,
+  maxTokensPerChunk = 100000,
+  overlapTokens = 2000,
+) {
+  const maxCharsPerChunk = maxTokensPerChunk * 4;
+  const overlapChars = overlapTokens * 4;
+
+  // If content fits in one chunk, return as-is
+  if (content.length <= maxCharsPerChunk) {
+    return [content];
+  }
+
+  const chunks = [];
+  let start = 0;
+
+  while (start < content.length) {
+    let end = start + maxCharsPerChunk;
+
+    // If this is the last chunk, just take the rest
+    if (end >= content.length) {
+      chunks.push(content.slice(start));
+      break;
+    }
+
+    // Try to find a natural break point (newline or space) near the end
+    // Look for newline first
+    let breakPoint = content.lastIndexOf("\n\n", end);
+    if (breakPoint <= start || breakPoint - start < maxCharsPerChunk * 0.8) {
+      // If no good paragraph break, try single newline
+      breakPoint = content.lastIndexOf("\n", end);
+    }
+    if (breakPoint <= start || breakPoint - start < maxCharsPerChunk * 0.8) {
+      // If no newline, try space
+      breakPoint = content.lastIndexOf(" ", end);
+    }
+    if (breakPoint <= start) {
+      // No natural break found, just cut at max length
+      breakPoint = end;
+    }
+
+    chunks.push(content.slice(start, breakPoint));
+
+    // Move start forward, including overlap
+    start = breakPoint - overlapChars;
+    if (start < 0) start = 0;
+  }
+
+  return chunks;
+}
+
+/**
+ * Chunks search results into batches that fit within token limits
+ * @param {Object} searchResults - The search results object with hits array
+ * @param {number} maxTokensPerChunk - Maximum tokens per chunk
+ * @returns {Object[]} Array of search result batches
+ */
+export function chunkSearchResults(searchResults, maxTokensPerChunk = 100000) {
+  if (!searchResults.hits || searchResults.hits.length === 0) {
+    return [searchResults];
+  }
+
+  const batches = [];
+  let currentBatch = { hits: [], total: 0 };
+  let currentTokenCount = 0;
+
+  for (const hit of searchResults.hits) {
+    const hitContent = hit.content || hit.text || "";
+    const hitTokens = estimateTokens(hitContent);
+
+    // If adding this hit would exceed the limit, start a new batch
+    if (
+      currentTokenCount + hitTokens > maxTokensPerChunk &&
+      currentBatch.hits.length > 0
+    ) {
+      batches.push(currentBatch);
+      currentBatch = { hits: [], total: 0 };
+      currentTokenCount = 0;
+    }
+
+    currentBatch.hits.push(hit);
+    currentBatch.total++;
+    currentTokenCount += hitTokens;
+  }
+
+  // Don't forget the last batch
+  if (currentBatch.hits.length > 0) {
+    batches.push(currentBatch);
+  }
+
+  return batches;
+}
+
+/**
+ * Builds a summary prompt for combining chunk results
+ */
+export function buildChunkCombinationPrompt(query, chunkResults, totalChunks) {
+  let prompt = `You are analyzing a long interview transcript that was split into ${totalChunks} parts due to length.
+
+QUERY: "${query}"
+
+Below are the relevant quotes found from each part of the transcript. Your task is to:
+1. Combine and deduplicate similar quotes
+2. Organize ALL unique quotes by theme
+3. Ensure each theme flows logically
+4. Include EVERY meaningful quote - don't summarize away the details
+
+`;
+
+  chunkResults.forEach((result, index) => {
+    prompt += `\n=== PART ${index + 1} RESULTS ===\n${result}\n`;
+  });
+
+  prompt += `\n=== FINAL OUTPUT ===\n
+Provide a comprehensive response that:
+- Groups quotes by theme (e.g., "Struggles and Sacrifices", "Passion and Dreams")
+- Lists quotes under each person
+- Uses the exact format: **Person Name** followed by bullet points with Filename | Time: "Quote"
+- Includes ALL unique quotes found across all parts
+- Maintains the original timestamps and filenames
+
+If the same quote appears multiple times, include it only once.`;
 
   return prompt;
 }
