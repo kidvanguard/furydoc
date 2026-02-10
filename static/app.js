@@ -657,12 +657,13 @@ async function sendMessage() {
 
     // Step 2: Run all searches
     const allResults = { hits: [], total: 0 };
-    const seenFiles = new Set();
+    const seenContent = new Set(); // Track seen content to avoid duplicates across files
 
     for (const searchTerm of allSearches) {
       console.log(`[DEBUG] Searching: "${searchTerm}"`);
       try {
-        const results = await searchElasticsearch(searchTerm);
+        // Use larger size to get more content from throughout the file
+        const results = await searchElasticsearch(searchTerm, 200);
         console.log(
           `[DEBUG] Found ${results.hits?.length || 0} hits for "${searchTerm}"`,
         );
@@ -683,12 +684,16 @@ async function sendMessage() {
               }
             }
           }
-          if (!seenFiles.has(filename)) {
-            seenFiles.add(filename);
+
+          // Create a content signature to avoid duplicate chunks
+          const contentSig = `${filename}:${(hit.content || "").slice(0, 200)}`;
+          if (!seenContent.has(contentSig)) {
+            seenContent.add(contentSig);
+            hit.filename = filename; // Ensure filename is set
             allResults.hits.push(hit);
             allResults.total++;
           } else {
-            console.log(`[DEBUG] Skipping duplicate file: ${filename}`);
+            console.log(`[DEBUG] Skipping duplicate content from: ${filename}`);
           }
         }
       } catch (e) {
@@ -697,11 +702,10 @@ async function sendMessage() {
     }
 
     console.log(`[DEBUG] Total unique results: ${allResults.total}`);
-    console.log(
-      "[DEBUG] Files found:",
-      allResults.hits.map((h) => h.filename),
-    );
-    showToast(`Found ${allResults.total} clips, analyzing...`, "info");
+    console.log("[DEBUG] Files found:", [
+      ...new Set(allResults.hits.map((h) => h.filename)),
+    ]);
+    showToast(`Found ${allResults.total} unique clips, analyzing...`, "info");
 
     // Step 3: Send to OpenRouter for final organization
     const promptPreview = buildPromptWithResults(content, allResults).slice(
