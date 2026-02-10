@@ -638,66 +638,106 @@ async function sendMessage() {
   showThinking();
 
   try {
-    // Step 1: Ask LLM to plan the searches
-    showToast("Planning searches with AI...", "info");
-    const plannedSearches = await planSearches(content);
-    console.log("[DEBUG] Planned searches:", plannedSearches);
+    // Check if query mentions a specific filename
+    const filenameMatch =
+      content.match(
+        /from\s+(?:the\s+)?(?:file\s+)?["']?([^"']+\.(?:txt|vtt|srt))["']?/i,
+      ) ||
+      content.match(
+        /(?:file|transcript|document)["']?\s*:?\s*["']?([^"']+\.(?:txt|vtt|srt))["']?/i,
+      );
 
-    // Also get related searches from our predefined list
-    const relatedSearches = getRelatedSearches(content);
-    console.log("[DEBUG] Related searches:", relatedSearches);
+    let allResults = { hits: [], total: 0 };
 
-    // Combine and deduplicate
-    const allSearches = [
-      ...new Set([content, ...plannedSearches, ...relatedSearches]),
-    ];
+    if (filenameMatch) {
+      // User asked for a specific file - fetch the full document
+      const filename = filenameMatch[1].trim();
+      console.log(`[DEBUG] Detected specific file request: ${filename}`);
+      showToast(`Fetching full transcript: ${filename}...`, "info");
 
-    console.log("[DEBUG] Running searches:", allSearches);
-    showToast(`Running ${allSearches.length} searches...`, "info");
-
-    // Step 2: Run all searches
-    const allResults = { hits: [], total: 0 };
-    const seenContent = new Set(); // Track seen content to avoid duplicates across files
-
-    for (const searchTerm of allSearches) {
-      console.log(`[DEBUG] Searching: "${searchTerm}"`);
-      try {
-        // Use larger size to get more content from throughout the file
-        const results = await searchElasticsearch(searchTerm, 200);
+      const fullDoc = await fetchFullDocument(filename);
+      if (fullDoc && fullDoc.content) {
+        allResults.hits.push({
+          filename: fullDoc.filename || filename,
+          content: fullDoc.content,
+          speaker: fullDoc.speaker || "",
+          timestamp: fullDoc.timestamp || "",
+        });
+        allResults.total = 1;
         console.log(
-          `[DEBUG] Found ${results.hits?.length || 0} hits for "${searchTerm}"`,
+          `[DEBUG] Fetched full document with ${fullDoc.content.length} chars`,
         );
-        for (const hit of results.hits || []) {
-          // Extract filename from hit - check field first, then extract from content
-          let filename = hit.filename || "unknown";
-          if (!filename || filename === "Unknown" || filename === "unknown") {
-            // Try to extract from content (format: "Filename: Name\n\n" or "Name\n\n1\n")
-            const content = hit.content || hit.text || "";
-            const filenameMatch = content.match(/Filename:\s*([^\n]+)/i);
-            if (filenameMatch) {
-              filename = filenameMatch[1].trim();
-            } else {
-              // Try first non-empty line before timestamp
-              const lines = content.split("\n").filter((l) => l.trim());
-              if (lines.length > 0 && !lines[0].match(/^\d+\s*$/)) {
-                filename = lines[0].trim();
+      } else {
+        console.log(
+          "[DEBUG] Full document fetch failed, falling back to search",
+        );
+      }
+    }
+
+    // If no specific file or fetch failed, do regular search
+    if (allResults.total === 0) {
+      // Step 1: Ask LLM to plan the searches
+      showToast("Planning searches with AI...", "info");
+      const plannedSearches = await planSearches(content);
+      console.log("[DEBUG] Planned searches:", plannedSearches);
+
+      // Also get related searches from our predefined list
+      const relatedSearches = getRelatedSearches(content);
+      console.log("[DEBUG] Related searches:", relatedSearches);
+
+      // Combine and deduplicate
+      const allSearches = [
+        ...new Set([content, ...plannedSearches, ...relatedSearches]),
+      ];
+
+      console.log("[DEBUG] Running searches:", allSearches);
+      showToast(`Running ${allSearches.length} searches...`, "info");
+
+      // Step 2: Run all searches
+      const seenContent = new Set(); // Track seen content to avoid duplicates across files
+
+      for (const searchTerm of allSearches) {
+        console.log(`[DEBUG] Searching: "${searchTerm}"`);
+        try {
+          // Use larger size to get more content from throughout the file
+          const results = await searchElasticsearch(searchTerm, 200);
+          console.log(
+            `[DEBUG] Found ${results.hits?.length || 0} hits for "${searchTerm}"`,
+          );
+          for (const hit of results.hits || []) {
+            // Extract filename from hit - check field first, then extract from content
+            let filename = hit.filename || "unknown";
+            if (!filename || filename === "Unknown" || filename === "unknown") {
+              // Try to extract from content (format: "Filename: Name\n\n" or "Name\n\n1\n")
+              const content = hit.content || hit.text || "";
+              const filenameMatch = content.match(/Filename:\s*([^\n]+)/i);
+              if (filenameMatch) {
+                filename = filenameMatch[1].trim();
+              } else {
+                // Try first non-empty line before timestamp
+                const lines = content.split("\n").filter((l) => l.trim());
+                if (lines.length > 0 && !lines[0].match(/^\d+\s*$/)) {
+                  filename = lines[0].trim();
+                }
               }
             }
-          }
 
-          // Create a content signature to avoid duplicate chunks
-          const contentSig = `${filename}:${(hit.content || "").slice(0, 200)}`;
-          if (!seenContent.has(contentSig)) {
-            seenContent.add(contentSig);
-            hit.filename = filename; // Ensure filename is set
-            allResults.hits.push(hit);
-            allResults.total++;
-          } else {
-            console.log(`[DEBUG] Skipping duplicate content from: ${filename}`);
+            // Create a content signature to avoid duplicate chunks
+            const contentSig = `${filename}:${(hit.content || "").slice(0, 200)}`;
+            if (!seenContent.has(contentSig)) {
+              seenContent.add(contentSig);
+              hit.filename = filename; // Ensure filename is set
+              allResults.hits.push(hit);
+              allResults.total++;
+            } else {
+              console.log(
+                `[DEBUG] Skipping duplicate content from: ${filename}`,
+              );
+            }
           }
+        } catch (e) {
+          console.error(`[DEBUG] Search failed for "${searchTerm}":`, e);
         }
-      } catch (e) {
-        console.error(`[DEBUG] Search failed for "${searchTerm}":`, e);
       }
     }
 
@@ -757,14 +797,17 @@ async function sendMessage() {
   }
 }
 
-async function searchElasticsearch(query) {
+async function searchElasticsearch(query, size) {
   const response = await fetch(`${state.settings.workerUrl}/api/search`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       query,
       index: state.settings.esIndex || CONFIG.DEFAULT_ES_INDEX,
-      size: parseInt(state.settings.resultSize) || CONFIG.DEFAULT_RESULT_SIZE,
+      size:
+        size ||
+        parseInt(state.settings.resultSize) ||
+        CONFIG.DEFAULT_RESULT_SIZE,
     }),
   });
 
@@ -774,6 +817,35 @@ async function searchElasticsearch(query) {
   }
 
   return await response.json();
+}
+
+// Fetch full document content when a specific filename is mentioned
+async function fetchFullDocument(filename) {
+  console.log(`[DEBUG] Fetching full document for: ${filename}`);
+  try {
+    const response = await fetch(`${state.settings.workerUrl}/api/document`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename,
+        index: state.settings.esIndex || CONFIG.DEFAULT_ES_INDEX,
+      }),
+    });
+
+    if (!response.ok) {
+      console.log(`[DEBUG] Document fetch failed: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log(
+      `[DEBUG] Fetched document with ${data.content?.length || 0} chars`,
+    );
+    return data;
+  } catch (e) {
+    console.error("[DEBUG] fetchFullDocument error:", e);
+    return null;
+  }
 }
 
 async function sendToOpenRouter(query, searchResults) {

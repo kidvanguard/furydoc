@@ -80,6 +80,10 @@ export default {
         return await handleSearch(request, env);
       }
 
+      if (path === "/api/document" && request.method === "POST") {
+        return await handleGetDocument(request, env);
+      }
+
       if (path === "/api/chat" && request.method === "POST") {
         return await handleChat(request, env);
       }
@@ -235,6 +239,106 @@ async function handleSearch(request, env) {
     );
   } catch (error) {
     console.error("handleSearch error:", error);
+    return new Response(
+      JSON.stringify({ error: error.message, stack: error.stack }),
+      {
+        status: 500,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      },
+    );
+  }
+}
+
+async function handleGetDocument(request, env) {
+  try {
+    const { filename, index = "furytranscripts" } = await request.json();
+
+    if (!filename) {
+      return new Response(JSON.stringify({ error: "Filename required" }), {
+        status: 400,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!env.ELASTICSEARCH_ENDPOINT || !env.ELASTICSEARCH_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "Elasticsearch not configured" }),
+        {
+          status: 500,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Search for document by filename
+    const esQuery = {
+      query: {
+        term: {
+          filename: filename,
+        },
+      },
+      size: 1,
+      _source: [
+        "filename",
+        "speaker",
+        "timestamp",
+        "start_time",
+        "attachment.content",
+      ],
+    };
+
+    const esUrl = `${env.ELASTICSEARCH_ENDPOINT}/${index}/_search`;
+    console.log("Fetching document:", filename);
+
+    const response = await fetch(esUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `ApiKey ${env.ELASTICSEARCH_API_KEY}`,
+      },
+      body: JSON.stringify(esQuery),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Elasticsearch error:", response.status, errorText);
+      return new Response(
+        JSON.stringify({
+          error: `Elasticsearch error: ${response.status} - ${errorText}`,
+        }),
+        {
+          status: 500,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const data = await response.json();
+
+    if (data.hits.hits.length === 0) {
+      return new Response(JSON.stringify({ error: "Document not found" }), {
+        status: 404,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+
+    const hit = data.hits.hits[0];
+    const content =
+      hit._source.attachment?.content || hit._source.content || "";
+
+    return new Response(
+      JSON.stringify({
+        filename: hit._source.filename,
+        content: content,
+        speaker: hit._source.speaker || "",
+        timestamp: hit._source.timestamp || hit._source.start_time || "",
+      }),
+      {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      },
+    );
+  } catch (error) {
+    console.error("handleGetDocument error:", error);
     return new Response(
       JSON.stringify({ error: error.message, stack: error.stack }),
       {
