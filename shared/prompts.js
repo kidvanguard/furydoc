@@ -364,15 +364,43 @@ export function chunkSearchResults(searchResults, maxTokensPerChunk = 100000) {
   let currentBatch = { hits: [], total: 0 };
   let currentTokenCount = 0;
 
-  for (const hit of searchResults.hits) {
-    const hitContent = hit.content || hit.text || "";
-    const hitTokens = estimateTokens(hitContent);
+  // Maximum tokens per individual hit (to prevent single massive transcripts)
+  // Use 20% of chunk size to ensure we can fit multiple hits and leave room for prompt overhead
+  const maxTokensPerHit = Math.floor(maxTokensPerChunk * 0.2);
+  const maxCharsPerHit = maxTokensPerHit * 4;
+
+  console.log(
+    `[chunkSearchResults] Starting with ${searchResults.hits.length} hits, maxTokensPerChunk=${maxTokensPerChunk}, maxTokensPerHit=${maxTokensPerHit}`,
+  );
+
+  for (let i = 0; i < searchResults.hits.length; i++) {
+    let hit = searchResults.hits[i];
+    let hitContent = hit.content || hit.text || "";
+    let hitTokens = estimateTokens(hitContent);
+
+    // If this single hit is too large, truncate it
+    if (hitTokens > maxTokensPerHit) {
+      console.log(
+        `[chunkSearchResults] Hit ${i}: Truncating from ${hitTokens} to ~${maxTokensPerHit} tokens (${maxCharsPerHit} chars)`,
+      );
+      hitContent =
+        hitContent.slice(0, maxCharsPerHit) +
+        "\n\n[... Content truncated due to length ...]";
+      hitTokens = estimateTokens(hitContent);
+      // Update the hit with truncated content
+      hit = { ...hit, content: hitContent, text: hitContent };
+    }
 
     // If adding this hit would exceed the limit, start a new batch
+    // Leave 20% buffer for prompt overhead
+    const effectiveLimit = Math.floor(maxTokensPerChunk * 0.8);
     if (
-      currentTokenCount + hitTokens > maxTokensPerChunk &&
+      currentTokenCount + hitTokens > effectiveLimit &&
       currentBatch.hits.length > 0
     ) {
+      console.log(
+        `[chunkSearchResults] Starting new batch. Previous batch: ${currentBatch.hits.length} hits, ~${currentTokenCount} tokens (limit: ${effectiveLimit})`,
+      );
       batches.push(currentBatch);
       currentBatch = { hits: [], total: 0 };
       currentTokenCount = 0;
@@ -385,8 +413,22 @@ export function chunkSearchResults(searchResults, maxTokensPerChunk = 100000) {
 
   // Don't forget the last batch
   if (currentBatch.hits.length > 0) {
+    console.log(
+      `[chunkSearchResults] Final batch: ${currentBatch.hits.length} hits, ~${currentTokenCount} tokens`,
+    );
     batches.push(currentBatch);
   }
+
+  console.log(`[chunkSearchResults] Created ${batches.length} batches`);
+  batches.forEach((batch, idx) => {
+    const batchTokens = batch.hits.reduce(
+      (sum, h) => sum + estimateTokens(h.content || h.text || ""),
+      0,
+    );
+    console.log(
+      `[chunkSearchResults] Batch ${idx + 1}: ${batch.hits.length} hits, ~${batchTokens} tokens`,
+    );
+  });
 
   return batches;
 }

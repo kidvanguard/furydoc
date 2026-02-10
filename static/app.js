@@ -7,7 +7,7 @@ import {
   estimateTokens,
   chunkSearchResults,
   buildChunkCombinationPrompt,
-} from "../shared/prompts.js";
+} from "../shared/prompts.js?v=5";
 
 const CONFIG = {
   // Password for access (simple shared password - not high security but keeps casual visitors out)
@@ -22,8 +22,11 @@ const CONFIG = {
   DEFAULT_RESULT_SIZE: 100,
 
   // Token limits for chunking
-  MAX_TOKENS_PER_REQUEST: 140000, // Leave room for system prompt (~10k) and output (~10k)
-  SAFE_CHUNK_SIZE: 120000, // Process chunks of this size
+  // DeepInfra provider (used by DeepSeek) has 32k token limit
+  MAX_TOKENS_PER_REQUEST: 25000, // Leave room for system prompt (~2k) and output (~2k)
+  SAFE_CHUNK_SIZE: 8000, // Process chunks of this size (fits in 32k limit)
+  // Note: buildResultsAnalysisPrompt adds ~10k tokens of overhead (criteria, examples, etc.)
+  // So 8k search results + 10k overhead = 18k total, leaving room for system prompt
 
   // Local storage keys
   STORAGE_KEY: "docu-research-chats",
@@ -578,15 +581,39 @@ async function planSearches(query) {
       }),
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        "[DEBUG] planSearches API error:",
+        response.status,
+        errorText,
+      );
+      return [];
+    }
 
     const data = await response.json();
+
+    // Validate response has content
+    if (!data.content) {
+      console.error("[DEBUG] planSearches unexpected response:", data);
+      return [];
+    }
+
     const content = data.content || "";
 
     // Extract JSON array from response
     const match = content.match(/\[[^\]]+\]/);
     if (match) {
-      return JSON.parse(match[0]);
+      try {
+        return JSON.parse(match[0]);
+      } catch (parseError) {
+        console.error(
+          "[DEBUG] Failed to parse search plan JSON:",
+          match[0],
+          parseError,
+        );
+        return [];
+      }
     }
     return [];
   } catch (e) {
@@ -607,6 +634,9 @@ async function sendMessage() {
     return;
   }
 
+  // Get chat reference upfront
+  const chat = state.chats.find((c) => c.id === state.currentChatId);
+
   // Add user message
   const userMessage = {
     id: Date.now().toString(),
@@ -618,7 +648,6 @@ async function sendMessage() {
   state.currentMessages.push(userMessage);
 
   // Update chat
-  const chat = state.chats.find((c) => c.id === state.currentChatId);
   if (chat) {
     chat.messages = [...state.currentMessages];
     chat.model = elements.modelSelector.value;
@@ -902,6 +931,11 @@ async function sendToOpenRouter(query, searchResults) {
     console.log(`[DEBUG] Processing chunk ${i + 1}/${chunks.length}`);
 
     const chunkPrompt = buildPromptWithResults(query, chunks[i]);
+    const chunkPromptTokens = estimateTokens(chunkPrompt);
+    console.log(
+      `[DEBUG] Chunk ${i + 1} prompt size: ~${chunkPromptTokens} tokens (${chunkPrompt.length} chars)`,
+    );
+
     const chunkResponse = await sendSingleRequestWithPrompt(chunkPrompt);
     chunkResults.push(chunkResponse);
   }
@@ -950,11 +984,26 @@ async function sendSingleRequestWithPrompt(prompt) {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Chat failed");
+    const errorText = await response.text();
+    console.error("[DEBUG] Chat API error response:", errorText);
+    let errorMessage = "Chat failed";
+    try {
+      const errorData = JSON.parse(errorText);
+      errorMessage = errorData.error || errorData.details || errorText;
+    } catch (e) {
+      errorMessage = errorText || `HTTP ${response.status}`;
+    }
+    throw new Error(errorMessage);
   }
 
   const data = await response.json();
+
+  // Validate response structure
+  if (!data.content) {
+    console.error("[DEBUG] Unexpected response structure:", data);
+    throw new Error("Invalid response from server: missing content");
+  }
+
   return data.content;
 }
 

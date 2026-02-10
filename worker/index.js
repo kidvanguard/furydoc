@@ -389,6 +389,60 @@ async function handleChat(request, env) {
 
     const data = await response.json();
 
+    // Check if OpenRouter returned an error
+    if (data.error) {
+      console.error("OpenRouter API error:", JSON.stringify(data.error));
+      return new Response(
+        JSON.stringify({
+          error: "AI service error",
+          details: data.error.message || data.error.code || "Unknown error",
+        }),
+        {
+          status: 500,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Check if response has expected format
+    if (
+      !data.choices ||
+      !Array.isArray(data.choices) ||
+      data.choices.length === 0
+    ) {
+      console.error(
+        "Unexpected OpenRouter response - no choices:",
+        JSON.stringify(data).slice(0, 2000),
+      );
+      return new Response(
+        JSON.stringify({
+          error: "Unexpected response from AI service",
+          details: "Response missing choices array",
+        }),
+        {
+          status: 500,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (!data.choices[0].message || !data.choices[0].message.content) {
+      console.error(
+        "Unexpected OpenRouter response - no message content:",
+        JSON.stringify(data.choices[0]).slice(0, 1000),
+      );
+      return new Response(
+        JSON.stringify({
+          error: "Unexpected response from AI service",
+          details: "Response missing message content",
+        }),
+        {
+          status: 500,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     return new Response(
       JSON.stringify({
         content: data.choices[0].message.content,
