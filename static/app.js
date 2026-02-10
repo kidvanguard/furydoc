@@ -1,6 +1,11 @@
 // Cybersyn - Main Application
 // Features: Password protection, multi-tab chat, ES search, OpenRouter integration
 
+import {
+  getPlanSearchesPrompt,
+  buildResultsAnalysisPrompt,
+} from "../shared/prompts.js";
+
 const CONFIG = {
   // Password for access (simple shared password - not high security but keeps casual visitors out)
   ACCESS_PASSWORD: "uncledaddy",
@@ -530,34 +535,7 @@ function getRelatedSearches(query) {
 async function planSearches(query) {
   console.log("[DEBUG] planSearches called with query:", query);
   // Ask LLM to plan what searches to run - focusing on emotional/interesting content
-  const planPrompt = `You are a documentary researcher. The user wants: "${query}"
-
-Your task: Create search terms that will find the MOST INTERESTING and EMOTIONALLY COMPELLING moments, not just literal matches.
-
-GOOD quotes show:
-- Personal struggles, sacrifices, or conflicts
-- Emotional turning points or revelations
-- Unique perspectives or surprising insights
-- Character-defining moments
-- Vulnerability or authenticity
-- Stories with stakes or tension
-
-BAD quotes are:
-- Just factual introductions ("My name is...")
-- Generic pleasantries
-- Technical setup checks
-- Repetitive or filler content
-
-Example response for "wrestling passion":
-["dream sacrifice", "love wrestling means", "why wrestling emotional", "wrestling identity purpose", "family didn't understand", "risk everything", "wrestling saved me", "obsession devotion"]
-
-Example response for "struggles":
-["debt broke money", "injury pain recover", "quit almost gave up", "family反对 objection", "sacrifice left home", "dark times struggle", "failed but kept going"]
-
-Example response for "character moments":
-["funny moment laughed", "angry frustrated pissed", "crying emotional", "proud achievement", "regret wish different", "scared nervous afraid"]
-
-Respond with ONLY a JSON array of 6-10 specific, emotionally-focused search terms for: "${query}"`;
+  const planPrompt = getPlanSearchesPrompt(query);
 
   try {
     console.log("[DEBUG] Sending plan request to LLM...");
@@ -942,77 +920,23 @@ function extractTimestamp(content) {
 }
 
 function buildPromptWithResults(query, searchResults) {
-  let prompt = `QUERY: "${query}"\n\n`;
-  prompt += `CRITICAL INSTRUCTIONS - READ CAREFULLY:\n`;
-  prompt += `You are a documentary editor finding QUOTES FOR A FILM. Your job is to find the MOST COMPELLING, EMOTIONAL, and CHARACTER-DEFINING moments.\n\n`;
-  prompt += `WHAT MAKES A GOOD QUOTE:\n`;
-  prompt += `- Shows vulnerability, struggle, or personal stakes\n`;
-  prompt += `- Reveals something surprising or unexpected about the person\n`;
-  prompt += `- Has emotional weight - makes you FEEL something\n`;
-  prompt += `- Tells a story with a beginning, middle, and end\n`;
-  prompt += `- Shows transformation or change\n`;
-  prompt += `- Is authentic and unscripted-sounding\n\n`;
-  prompt += `WHAT TO AVOID:\n`;
-  prompt += `- Basic introductions ("My name is...", "I am from...")\n`;
-  prompt += `- Generic pleasantries or small talk\n`;
-  prompt += `- Technical setup ("Can you hear me?", "Testing audio")\n`;
-  prompt += `- Repetitive or filler content\n`;
-  prompt += `- Statements without emotional stakes\n\n`;
-  prompt += `OUTPUT FORMAT:\n`;
-  prompt += `1. Organize by THEME (2-5 sections with compelling titles)\n`;
-  prompt += `2. For each theme, write 1-2 sentences explaining WHY these quotes matter for the film\n`;
-  prompt += `3. Use this format for quotes:\n`;
-  prompt += `   - **Filename** | \`timestamp\`: "Exact quote text"\n`;
-  prompt += `4. Select ONLY the 3-8 BEST quotes total - quality over quantity\n`;
-  prompt += `5. Prioritize quotes that reveal character, show struggle, or have emotional impact\n\n`;
-  prompt += `EXAMPLE:\n`;
-  prompt += `### The Weight of the Dream\n`;
-  prompt += `Context: Pumi reveals the personal cost of pursuing wrestling, showing vulnerability that makes his journey relatable.\n\n`;
-  prompt += `**Pumi**\n`;
-  prompt += `- **Pumi Interview Arcadia Rooftop** | \`00:08:01.780 – 00:08:07.540\`: "I have about one million debt when I was 19."\n`;
-  prompt += `- **Pumi Interview Arcadia Rooftop** | \`00:07:08.980 – 00:07:13.139\`: "Just spin my knee for that and I lost everything."\n\n`;
-
-  if (searchResults.hits && searchResults.hits.length > 0) {
-    // Group by filename to avoid duplication
-    const fileGroups = {};
-    searchResults.hits.forEach((hit) => {
-      const exactFilename = extractFilename(hit);
-      if (!fileGroups[exactFilename]) {
-        fileGroups[exactFilename] = [];
-      }
-      fileGroups[exactFilename].push(hit);
-    });
-
-    prompt += `TRANSCRIPT CONTENT:\n`;
-    prompt += `==================\n\n`;
-
-    Object.entries(fileGroups).forEach(([filename, hits]) => {
-      prompt += `FILE: "${filename}"\n`;
-
-      hits.forEach((hit, idx) => {
+  // Use the shared prompt builder, but we need to enhance the searchResults
+  // with extracted timestamps since the shared function expects them
+  const enhancedResults = {
+    ...searchResults,
+    hits:
+      searchResults.hits?.map((hit) => {
         const content = hit.content || hit.text || "";
-        // Extract timestamp from content if not in field
         const extractedTs = extractTimestamp(content);
-        const timestamp = hit.timestamp || extractedTs || "";
+        return {
+          ...hit,
+          timestamp: hit.timestamp || extractedTs || "",
+          filename: hit.filename || extractFilename(hit),
+        };
+      }) || [],
+  };
 
-        if (timestamp) {
-          prompt += `[${timestamp}] `;
-        }
-
-        // Include up to 1500 chars to give more context
-        const truncatedContent =
-          content.length > 1500 ? content.slice(0, 1500) + "..." : content;
-
-        prompt += `${truncatedContent}\n`;
-      });
-
-      prompt += `\n---\n\n`;
-    });
-  } else {
-    prompt += "No search results found.\n";
-  }
-
-  return prompt;
+  return buildResultsAnalysisPrompt(query, enhancedResults);
 }
 
 // Rendering

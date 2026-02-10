@@ -1,68 +1,13 @@
 // Cloudflare Worker for Elasticsearch Documentary Assistant
 // This worker proxies requests to Elasticsearch and OpenRouter
 
+import { TIMECODE_AGENT_PROMPT } from "../shared/prompts.js";
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
-
-// Documentary Editor Agent Prompt
-const TIMECODE_AGENT_PROMPT = `You are a documentary researcher analyzing interview transcripts.
-
-YOUR TASK: Extract quotes that are DIRECTLY RELEVANT to the user's query and organize them by theme.
-
-CRITICAL RULES:
-1. ONLY INCLUDE QUOTES THAT HAVE EMOTIONAL IMPACT - even if they do not use exact keywords from the query - Look for quotes that reveal character depth, show vulnerability, or tell compelling stories. The best quotes often surprise you.
-2. EXCLUDE: introductions ("I'm 28"), small talk ("How are you?"), technical checks ("Is the mic on?"), and any content not directly related to the query topic.
-3. IF you find 20 relevant clips, output all 20. IF you find 50, output all 50.
-4. FULL QUOTES - Include complete sentences and thoughts that are on-topic.
-5. USE EXACT TIMESTAMPS FROM TRANSCRIPT - The transcript shows timestamps like "Filename | 00:00:00.001 – 00:00:01.760". You MUST copy these exact timestamps in your response. NEVER use "00:00:00 – 00:00:00".
-6. NO "Filename:" label - Use: - Filename | Time: "quote"
-7. Group by theme first, then by person under each theme.
-
-OUTPUT FORMAT:
-
-### Theme Name
-Brief context about this theme.
-
-**Person Name**
-- Filename | Time: "Full quote"
-- Filename | Time: "Another quote from same person"
-
-**Another Person**
-- Filename | Time: "Quote"
-
-EXAMPLE:
-If the query is "career sacrifices" and transcript shows relevant content at "Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760", your output should be:
-- Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760: "quote about sacrifices here"
-
-EMOTIONAL IMPACT CHECK: Before including any quote, ask yourself: "Does this quote ACTUALLY discuss the query topic?" 
-
-FOR "career sacrifices" ONLY INCLUDE quotes about:
-- Financial struggles, debt, low pay
-- Leaving family/home behind
-- Physical pain, injuries from training
-- Giving up stable jobs/opportunities
-- Working long hours without rest
-- Moving countries for wrestling
-- Family not understanding/supporting the career
-- Missing important life events for wrestling
-
-EXCLUDE these even if from matching documents:
-- Weather reports (rain, flooding)
-- Event logistics (show postponed, setup issues)
-- Bio introductions ("I'm the founder", "My name is")
-- Generic career summaries without sacrifice details
-- Technical problems (sound checks, equipment)
-- Goals and ambitions ("I want to wrestle in WWE")
-- Match descriptions/injuries during shows
-- Audience experience descriptions
-- Complaints about minor inconveniences
-
-WHEN IN DOUBT, INCLUDE IT if it has emotional resonance. A shorter list of highly relevant quotes is better than a long list with irrelevant filler.
-
-REMEMBER: The user wants EMOTIONALLY COMPELLING quotes that would work in a documentary trailer.`;
 
 export default {
   async fetch(request, env, ctx) {
