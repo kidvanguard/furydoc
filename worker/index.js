@@ -13,7 +13,7 @@ const TIMECODE_AGENT_PROMPT = `You are a documentary researcher analyzing interv
 YOUR TASK: Extract quotes that are DIRECTLY RELEVANT to the user's query and organize them by theme.
 
 CRITICAL RULES:
-1. ONLY INCLUDE QUOTES THAT ACTUALLY MATCH THE QUERY - If the query is "career sacrifices", only include quotes about sacrifices, struggles, giving things up for work, financial hardship, leaving family, etc. Do NOT include random biographical info or unrelated conversation.
+1. ONLY INCLUDE QUOTES THAT HAVE EMOTIONAL IMPACT - even if they do not use exact keywords from the query - Look for quotes that reveal character depth, show vulnerability, or tell compelling stories. The best quotes often surprise you.
 2. EXCLUDE: introductions ("I'm 28"), small talk ("How are you?"), technical checks ("Is the mic on?"), and any content not directly related to the query topic.
 3. IF you find 20 relevant clips, output all 20. IF you find 50, output all 50.
 4. FULL QUOTES - Include complete sentences and thoughts that are on-topic.
@@ -37,7 +37,7 @@ EXAMPLE:
 If the query is "career sacrifices" and transcript shows relevant content at "Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760", your output should be:
 - Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760: "quote about sacrifices here"
 
-STRICT RELEVANCE CHECK: Before including any quote, ask yourself: "Does this quote ACTUALLY discuss the query topic?" 
+EMOTIONAL IMPACT CHECK: Before including any quote, ask yourself: "Does this quote ACTUALLY discuss the query topic?" 
 
 FOR "career sacrifices" ONLY INCLUDE quotes about:
 - Financial struggles, debt, low pay
@@ -60,9 +60,9 @@ EXCLUDE these even if from matching documents:
 - Audience experience descriptions
 - Complaints about minor inconveniences
 
-WHEN IN DOUBT, LEAVE IT OUT. A shorter list of highly relevant quotes is better than a long list with irrelevant filler.
+WHEN IN DOUBT, INCLUDE IT if it has emotional resonance. A shorter list of highly relevant quotes is better than a long list with irrelevant filler.
 
-REMEMBER: The user wants quality documentary clips about sacrifices, not random quotes from wrestlers.`;
+REMEMBER: The user wants EMOTIONALLY COMPELLING quotes that would work in a documentary trailer.`;
 
 export default {
   async fetch(request, env, ctx) {
