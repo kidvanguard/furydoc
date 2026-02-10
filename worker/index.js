@@ -73,6 +73,7 @@ async function handleSearch(request, env) {
       query,
       index = "furytranscripts",
       size = 50,
+      filename = null,
     } = await request.json();
 
     if (!query) {
@@ -103,32 +104,74 @@ async function handleSearch(request, env) {
     }
 
     // Build Elasticsearch query - furytranscripts uses attachment.content
-    const esQuery = {
-      query: {
-        multi_match: {
-          query: query,
-          fields: ["attachment.content^3", "filename", "speaker"],
-          type: "best_fields",
-          fuzziness: "AUTO",
-        },
-      },
-      size: size,
-      _source: [
-        "filename",
-        "speaker",
-        "timestamp",
-        "start_time",
-        "attachment.content",
-      ],
-      highlight: {
-        fields: {
-          "attachment.content": {
-            fragment_size: 1000,
-            number_of_fragments: 20,
+    let esQuery;
+
+    if (filename) {
+      // If filename is specified, filter by it
+      esQuery = {
+        query: {
+          bool: {
+            must: {
+              multi_match: {
+                query: query,
+                fields: ["attachment.content^3", "filename", "speaker"],
+                type: "best_fields",
+                fuzziness: "AUTO",
+              },
+            },
+            filter: {
+              wildcard: {
+                filename: `*${filename}*`,
+              },
+            },
           },
         },
-      },
-    };
+        size: size,
+        _source: [
+          "filename",
+          "speaker",
+          "timestamp",
+          "start_time",
+          "attachment.content",
+        ],
+        highlight: {
+          fields: {
+            "attachment.content": {
+              fragment_size: 1000,
+              number_of_fragments: 20,
+            },
+          },
+        },
+      };
+    } else {
+      // Regular search without filename filter
+      esQuery = {
+        query: {
+          multi_match: {
+            query: query,
+            fields: ["attachment.content^3", "filename", "speaker"],
+            type: "best_fields",
+            fuzziness: "AUTO",
+          },
+        },
+        size: size,
+        _source: [
+          "filename",
+          "speaker",
+          "timestamp",
+          "start_time",
+          "attachment.content",
+        ],
+        highlight: {
+          fields: {
+            "attachment.content": {
+              fragment_size: 1000,
+              number_of_fragments: 20,
+            },
+          },
+        },
+      };
+    }
 
     const esUrl = `${env.ELASTICSEARCH_ENDPOINT}/${index}/_search`;
     console.log("Searching Elasticsearch:", esUrl);

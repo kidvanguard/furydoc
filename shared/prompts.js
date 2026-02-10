@@ -11,8 +11,9 @@ YOUR TASK: Extract quotes that are DIRECTLY RELEVANT to the user's query and org
 
 CRITICAL RULES:
 1. ONLY INCLUDE QUOTES THAT HAVE EMOTIONAL IMPACT - even if they do not use exact keywords from the query - Look for quotes that reveal character depth, show vulnerability, or tell compelling stories. The best quotes often surprise you.
-2. EXCLUDE: introductions ("I'm 28"), small talk ("How are you?"), technical checks ("Is the mic on?"), and any content not directly related to the query topic.
-3. IF you find 20 relevant clips, output all 20. IF you find 50, output all 50.
+2. EXCLUDE: interviewer questions (the person asking questions is NOT the interview subject), introductions ("I'm 28"), small talk ("How are you?"), technical checks ("Is the mic on?"), and any content not directly related to the query topic.
+3. ONLY extract quotes from the INTERVIEW SUBJECT (the person being interviewed), NOT from the interviewer asking questions.
+4. IF you find 20 relevant clips, output all 20. IF you find 50, output all 50.
 4. FULL QUOTES - Include complete sentences and thoughts that are on-topic.
 5. USE EXACT TIMESTAMPS FROM TRANSCRIPT - The transcript shows timestamps like "Filename | 00:00:00.001 – 00:00:01.760". You MUST copy these exact timestamps in your response. NEVER use "00:00:00 – 00:00:00".
 6. NO "Filename:" label - Use: - Filename | Time: "quote"
@@ -199,6 +200,7 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
     prompt += `- Narrative arc - beginning, middle, transformation\n`;
     prompt += `- Universal themes (identity, belonging, sacrifice, passion)\n\n`;
     prompt += `ALWAYS EXCLUDE:\n`;
+    prompt += `- Interviewer questions (only extract quotes from the person BEING interviewed)\n`;
     prompt += `- Technical checks: "Can you hear me?" / "Is this on?" / "Testing one two"\n`;
     prompt += `- Empty agreements: standalone "Yeah" / "Sure" / "Okay" / "Right"\n`;
     prompt += `- Repetition: Same idea rephrased multiple times\n\n`;

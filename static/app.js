@@ -677,13 +677,17 @@ async function sendMessage() {
   showThinking();
 
   try {
-    // Check if query mentions a specific filename (with or without extension)
+    // Check if query mentions a specific filename
+    // Filenames are stored without extensions in the database
+    // Two patterns:
+    // 1. Quoted filename: "Pumi Interview Arcadia Rooftop" (requires quotes)
+    // 2. Explicit file reference: file: Name or transcript: Name
     const filenameMatch =
+      // Pattern 1: Quoted string (2-80 chars) - for specific filenames
+      content.match(/"([^"]{2,80})"/i) ||
+      // Pattern 2: Explicit file/transcript keyword with name (no quotes needed)
       content.match(
-        /from\s+(?:the\s+)?(?:file\s+)?["']?([^"']+(?:\.(?:txt|vtt|srt))?)["']?/i,
-      ) ||
-      content.match(
-        /(?:file|transcript|document)["']?\s*:?\s*["']?([^"']+(?:\.(?:txt|vtt|srt))?)["']?/i,
+        /(?:file|transcript|document)\s*:\s*["']?([^"':,]{2,50})["']?/i,
       );
 
     let allResults = { hits: [], total: 0 };
