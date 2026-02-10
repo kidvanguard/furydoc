@@ -921,6 +921,11 @@ body {
   display: block;
 }
 
+/* Mobile sidebar open state - must come after media query */
+.sidebar.open {
+  transform: translateX(0);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .sidebar {
@@ -933,10 +938,6 @@ body {
     transition: transform 0.3s ease;
     max-width: 85vw;
     width: 280px;
-  }
-
-  .sidebar.open {
-    transform: translateX(0);
   }
 
   .sidebar-resizer {
