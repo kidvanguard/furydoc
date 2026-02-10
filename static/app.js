@@ -1003,39 +1003,70 @@ async function sendToOpenRouter(query, searchResults) {
   const chunks = chunkSearchResults(searchResults, CONFIG.SAFE_CHUNK_SIZE);
   console.log(`[DEBUG] Split into ${chunks.length} chunks`);
 
-  // Process chunks in parallel with concurrency limit
-  const CONCURRENCY = 5; // Process 5 chunks at a time
+  // Process chunks with higher concurrency using a promise pool
+  // This starts new chunks immediately when slots free up, rather than waiting for entire batches
+  const CONCURRENCY = 10; // Increased from 5 to 10 for faster processing
   const chunkResults = new Array(chunks.length);
+  const executing = new Set();
+  let completedCount = 0;
 
-  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
-    const batch = chunks.slice(i, i + CONCURRENCY);
-    const batchIndices = batch.map((_, idx) => i + idx);
-
-    showToast(
-      `Processing chunks ${i + 1}-${Math.min(i + CONCURRENCY, chunks.length)} of ${chunks.length}...`,
-      "info",
-    );
-    console.log(
-      `[DEBUG] Processing chunks ${i + 1}-${Math.min(i + CONCURRENCY, chunks.length)}/${chunks.length} in parallel`,
-    );
-
-    // Process this batch in parallel
-    const batchPromises = batch.map(async (chunk, idx) => {
-      const chunkIndex = batchIndices[idx];
+  // Create all chunk promises with their indices
+  const chunkPromises = chunks.map((chunk, index) => {
+    return async () => {
       const chunkPrompt = buildPromptWithResults(query, chunk);
       const chunkPromptTokens = estimateTokens(chunkPrompt);
       console.log(
-        `[DEBUG] Chunk ${chunkIndex + 1} prompt size: ~${chunkPromptTokens} tokens (${chunkPrompt.length} chars)`,
+        `[DEBUG] Chunk ${index + 1}/${chunks.length} starting: ~${chunkPromptTokens} tokens`,
       );
 
+      const chunkStartTime = performance.now();
       const chunkResponse = await sendSingleRequestWithPrompt(chunkPrompt);
-      chunkResults[chunkIndex] = chunkResponse;
-      console.log(`[DEBUG] Chunk ${chunkIndex + 1}/${chunks.length} completed`);
-      return chunkResponse;
-    });
+      const chunkEndTime = performance.now();
 
-    await Promise.all(batchPromises);
+      chunkResults[index] = chunkResponse;
+      completedCount++;
+
+      console.log(
+        `[DEBUG] Chunk ${index + 1}/${chunks.length} completed in ${(chunkEndTime - chunkStartTime).toFixed(0)}ms (${completedCount}/${chunks.length} total)`,
+      );
+
+      // Update toast less frequently (every 5 chunks or on last chunk)
+      if (completedCount % 5 === 0 || completedCount === chunks.length) {
+        showToast(
+          `Processed ${completedCount}/${chunks.length} chunks...`,
+          "info",
+        );
+      }
+
+      return chunkResponse;
+    };
+  });
+
+  // Process with promise pool - maintains concurrency but doesn't wait for batches
+  console.log(
+    `[TIME] Starting ${chunks.length} chunks with concurrency ${CONCURRENCY}`,
+  );
+  const poolStartTime = performance.now();
+
+  for (const promiseFn of chunkPromises) {
+    const promise = promiseFn().then(() => {
+      executing.delete(promise);
+    });
+    chunkResults.push(promise);
+    executing.add(promise);
+
+    if (executing.size >= CONCURRENCY) {
+      await Promise.race(executing);
+    }
   }
+
+  // Wait for remaining promises
+  await Promise.all(executing);
+
+  const poolEndTime = performance.now();
+  console.log(
+    `[TIME] All ${chunks.length} chunks completed in ${(poolEndTime - poolStartTime).toFixed(0)}ms`,
+  );
 
   // If only one chunk, return it directly
   if (chunkResults.length === 1) {
