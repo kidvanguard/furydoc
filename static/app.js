@@ -158,20 +158,28 @@ function setupSidebarResize() {
 }
 
 function toggleSidebar() {
-  elements.sidebar.classList.toggle("open");
-  // Create or remove overlay
-  let overlay = document.querySelector(".sidebar-overlay");
-  if (elements.sidebar.classList.contains("open")) {
-    if (!overlay) {
-      overlay = document.createElement("div");
-      overlay.className = "sidebar-overlay";
-      overlay.addEventListener("click", toggleSidebar);
-      document.body.appendChild(overlay);
+  // Check if we're on mobile (sidebar is fixed positioned)
+  const isMobile = window.innerWidth <= 768;
+
+  if (isMobile) {
+    // Mobile behavior: toggle open class with overlay
+    elements.sidebar.classList.toggle("open");
+    let overlay = document.querySelector(".sidebar-overlay");
+    if (elements.sidebar.classList.contains("open")) {
+      if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.className = "sidebar-overlay";
+        overlay.addEventListener("click", toggleSidebar);
+        document.body.appendChild(overlay);
+      }
+      setTimeout(() => overlay.classList.add("active"), 10);
+    } else if (overlay) {
+      overlay.classList.remove("active");
+      setTimeout(() => overlay.remove(), 300);
     }
-    setTimeout(() => overlay.classList.add("active"), 10);
-  } else if (overlay) {
-    overlay.classList.remove("active");
-    setTimeout(() => overlay.remove(), 300);
+  } else {
+    // Desktop behavior: toggle collapsed class
+    elements.sidebar.classList.toggle("collapsed");
   }
 }
 
