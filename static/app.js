@@ -479,26 +479,35 @@ function getRelatedSearches(query) {
 
 async function planSearches(query) {
   console.log("[DEBUG] planSearches called with query:", query);
-  // Ask LLM to plan what searches to run
-  const planPrompt = `You are a documentary researcher. The user wants to find: "${query}"
+  // Ask LLM to plan what searches to run - focusing on emotional/interesting content
+  const planPrompt = `You are a documentary researcher. The user wants: "${query}"
 
-Your task: Determine what search terms would find the best material for this request.
+Your task: Create search terms that will find the MOST INTERESTING and EMOTIONALLY COMPELLING moments, not just literal matches.
 
-For example:
-- "trailer moments" → exciting, dramatic, emotional highlights
-- "career sacrifices" → money, family, leaving home, struggles
-- "funny moments" → jokes, laughs, humorous stories
-- "character introductions" → who they are, background, personality
+GOOD quotes show:
+- Personal struggles, sacrifices, or conflicts
+- Emotional turning points or revelations
+- Unique perspectives or surprising insights
+- Character-defining moments
+- Vulnerability or authenticity
+- Stories with stakes or tension
 
-Respond with ONLY a JSON array of 4-8 search terms. Be specific and varied.
+BAD quotes are:
+- Just factual introductions ("My name is...")
+- Generic pleasantries
+- Technical setup checks
+- Repetitive or filler content
 
-Example response for "trailer moments":
-["dramatic exciting", "emotional touching", "fighting action", "victory celebration", "struggle overcome", "dream passion", "never give up", "epic moment"]
+Example response for "wrestling passion":
+["dream sacrifice", "love wrestling means", "why wrestling emotional", "wrestling identity purpose", "family didn't understand", "risk everything", "wrestling saved me", "obsession devotion"]
 
-Example response for "career sacrifices":
-["money financial", "left family home", "struggle hard", "physical pain injury", "quit job", "training sacrifice", "moved to thailand", "debt broke"]
+Example response for "struggles":
+["debt broke money", "injury pain recover", "quit almost gave up", "family反对 objection", "sacrifice left home", "dark times struggle", "failed but kept going"]
 
-Now respond with JSON array for: "${query}"`;
+Example response for "character moments":
+["funny moment laughed", "angry frustrated pissed", "crying emotional", "proud achievement", "regret wish different", "scared nervous afraid"]
+
+Respond with ONLY a JSON array of 6-10 specific, emotionally-focused search terms for: "${query}"`;
 
   try {
     console.log("[DEBUG] Sending plan request to LLM...");
@@ -508,7 +517,7 @@ Now respond with JSON array for: "${query}"`;
       body: JSON.stringify({
         messages: [{ role: "user", content: planPrompt }],
         model: elements.modelSelector.value,
-        temperature: 0.7,
+        temperature: 0.8,
       }),
     });
 
@@ -793,50 +802,71 @@ function extractTimestamp(content) {
 }
 
 function buildPromptWithResults(query, searchResults) {
-  let prompt = `QUERY: ${query}\n\n`;
-  prompt += `INSTRUCTIONS FOR CHATBOT:\n`;
-  prompt += `- Extract quotes relevant to: ${query}\n`;
-  prompt += `- Use format: - Filename | Time: "Full quote here"\n`;
-  prompt += `- NO "Filename:" label, NO summaries in parentheses\n`;
-  prompt += `- Include full sentences, not fragments\n\n`;
+  let prompt = `QUERY: "${query}"\n\n`;
+  prompt += `CRITICAL INSTRUCTIONS - READ CAREFULLY:\n`;
+  prompt += `You are a documentary editor finding QUOTES FOR A FILM. Your job is to find the MOST COMPELLING, EMOTIONAL, and CHARACTER-DEFINING moments.\n\n`;
+  prompt += `WHAT MAKES A GOOD QUOTE:\n`;
+  prompt += `- Shows vulnerability, struggle, or personal stakes\n`;
+  prompt += `- Reveals something surprising or unexpected about the person\n`;
+  prompt += `- Has emotional weight - makes you FEEL something\n`;
+  prompt += `- Tells a story with a beginning, middle, and end\n`;
+  prompt += `- Shows transformation or change\n`;
+  prompt += `- Is authentic and unscripted-sounding\n\n`;
+  prompt += `WHAT TO AVOID:\n`;
+  prompt += `- Basic introductions ("My name is...", "I am from...")\n`;
+  prompt += `- Generic pleasantries or small talk\n`;
+  prompt += `- Technical setup ("Can you hear me?", "Testing audio")\n`;
+  prompt += `- Repetitive or filler content\n`;
+  prompt += `- Statements without emotional stakes\n\n`;
+  prompt += `OUTPUT FORMAT:\n`;
+  prompt += `1. Organize by THEME (2-5 sections with compelling titles)\n`;
+  prompt += `2. For each theme, write 1-2 sentences explaining WHY these quotes matter for the film\n`;
+  prompt += `3. Use this format for quotes:\n`;
+  prompt += `   - **Filename** | \`timestamp\`: "Exact quote text"\n`;
+  prompt += `4. Select ONLY the 3-8 BEST quotes total - quality over quantity\n`;
+  prompt += `5. Prioritize quotes that reveal character, show struggle, or have emotional impact\n\n`;
+  prompt += `EXAMPLE:\n`;
+  prompt += `### The Weight of the Dream\n`;
+  prompt += `Context: Pumi reveals the personal cost of pursuing wrestling, showing vulnerability that makes his journey relatable.\n\n`;
+  prompt += `**Pumi**\n`;
+  prompt += `- **Pumi Interview Arcadia Rooftop** | \`00:08:01.780 – 00:08:07.540\`: "I have about one million debt when I was 19."\n`;
+  prompt += `- **Pumi Interview Arcadia Rooftop** | \`00:07:08.980 – 00:07:13.139\`: "Just spin my knee for that and I lost everything."\n\n`;
 
   if (searchResults.hits && searchResults.hits.length > 0) {
-    // Group by person first to help the LLM
-    const personGroups = {};
+    // Group by filename to avoid duplication
+    const fileGroups = {};
     searchResults.hits.forEach((hit) => {
       const exactFilename = extractFilename(hit);
-      const speakerMatch = exactFilename.match(
-        /^(\w+)\s+(?:Interview|talking|tours?|hosting|outside|at|with|can't)/i,
-      );
-      const speaker = speakerMatch ? speakerMatch[1] : hit.speaker || "Unknown";
-
-      if (!personGroups[speaker]) {
-        personGroups[speaker] = [];
+      if (!fileGroups[exactFilename]) {
+        fileGroups[exactFilename] = [];
       }
-      personGroups[speaker].push(hit);
+      fileGroups[exactFilename].push(hit);
     });
 
-    prompt += `TRANSCRIPT CONTENT:\n\n`;
+    prompt += `TRANSCRIPT CONTENT:\n`;
+    prompt += `==================\n\n`;
 
-    Object.entries(personGroups).forEach(([speaker, hits]) => {
-      prompt += `--- ${speaker} ---\n`;
+    Object.entries(fileGroups).forEach(([filename, hits]) => {
+      prompt += `FILE: "${filename}"\n`;
+
       hits.forEach((hit, idx) => {
         const content = hit.content || hit.text || "";
-        const exactFilename = extractFilename(hit);
         // Extract timestamp from content if not in field
         const extractedTs = extractTimestamp(content);
-        const timestamp = hit.timestamp || extractedTs;
-        console.log(
-          `[DEBUG] Timestamp for ${exactFilename}: hit.timestamp="${hit.timestamp}", extracted="${extractedTs}", final="${timestamp}"`,
-        );
-        // More content - 1000 chars to find better quotes
-        const truncatedContent =
-          content.length > 1000 ? content.slice(0, 1000) + "..." : content;
+        const timestamp = hit.timestamp || extractedTs || "";
 
-        prompt += `${exactFilename}`;
-        if (timestamp) prompt += ` | ${timestamp}`;
-        prompt += `\n${truncatedContent}\n\n`;
+        if (timestamp) {
+          prompt += `[${timestamp}] `;
+        }
+
+        // Include up to 1500 chars to give more context
+        const truncatedContent =
+          content.length > 1500 ? content.slice(0, 1500) + "..." : content;
+
+        prompt += `${truncatedContent}\n`;
       });
+
+      prompt += `\n---\n\n`;
     });
   } else {
     prompt += "No search results found.\n";
@@ -1199,32 +1229,49 @@ function formatMessage(content) {
   // Convert headers (####, ###, ##, #) - MUST process longer patterns first
   formatted = formatted.replace(
     /^####\s*(.+)$/gim,
-    '<h4 style="margin: 12px 0 8px 0; color: var(--color-text); font-size: 1.1em;">$1</h4>',
+    '<h4 style="margin: 12px 0 8px 0; color: var(--color-text); font-size: 1.1em; font-weight: 600;">$1</h4>',
   );
   formatted = formatted.replace(
     /^###\s*(.+)$/gim,
-    '<h3 style="margin: 16px 0 8px 0; color: var(--color-text); border-bottom: 1px solid var(--color-border); padding-bottom: 4px; font-size: 1.2em;">$1</h3>',
+    '<h3 style="margin: 20px 0 12px 0; color: var(--color-accent); border-bottom: 2px solid var(--color-accent); padding-bottom: 6px; font-size: 1.3em; font-weight: 600;">$1</h3>',
   );
   formatted = formatted.replace(
     /^##\s*(.+)$/gim,
-    '<h2 style="margin: 20px 0 10px 0; color: var(--color-text); font-size: 1.4em;">$1</h2>',
+    '<h2 style="margin: 24px 0 14px 0; color: var(--color-text); font-size: 1.5em; font-weight: 600;">$1</h2>',
   );
   formatted = formatted.replace(
     /^#\s*(.+)$/gim,
-    '<h1 style="margin: 24px 0 12px 0; color: var(--color-text); font-size: 1.6em;">$1</h1>',
+    '<h1 style="margin: 28px 0 16px 0; color: var(--color-text); font-size: 1.7em; font-weight: 700;">$1</h1>',
   );
 
-  // Convert **bold** to <strong>
-  formatted = formatted.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  // Convert **bold** to <strong> (specific styling for filenames)
+  formatted = formatted.replace(
+    /\*\*([^*]+)\*\*/g,
+    '<strong style="color: var(--color-text); font-weight: 600;">$1</strong>',
+  );
 
-  // Convert list items (- or *) at start of line to list items
-  // Handle both standalone lines and lines after headers
-  formatted = formatted.replace(/^[\*\-]\s+(.+)$/gm, "<li>$1</li>");
+  // Convert `code` (timestamps) to styled spans
+  formatted = formatted.replace(
+    /`([^`]+)`/g,
+    '<code style="background: var(--color-bg-secondary); color: var(--color-accent); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.9em;">$1</code>',
+  );
+
+  // Convert list items (- or *) at start of line to list items with better styling
+  formatted = formatted.replace(
+    /^[\*\-]\s+(.+)$/gm,
+    '<li style="margin: 6px 0; line-height: 1.6;">$1</li>',
+  );
 
   // Wrap consecutive li elements in ul
   formatted = formatted.replace(
-    /(<li>.+<\/li>(?:\s|<br>)*)/g,
-    "<ul style='margin: 8px 0; padding-left: 20px;'>$1</ul>",
+    /(<li[^>]*>.+<\/li>(?:\s|<br>)*)/g,
+    "<ul style='margin: 12px 0; padding-left: 24px; list-style-type: disc;'>$1</ul>",
+  );
+
+  // Highlight "Context:" lines
+  formatted = formatted.replace(
+    /^(Context:.+)$/gim,
+    '<p style="color: var(--color-text-secondary); font-style: italic; margin: 8px 0 16px 0; padding: 8px 12px; background: var(--color-bg-secondary); border-radius: 6px; border-left: 3px solid var(--color-accent);">$1</p>',
   );
 
   // Now escape HTML in remaining text (not in tags we just created)
@@ -1247,7 +1294,15 @@ function formatMessage(content) {
     '<a href="$1" target="_blank" rel="noopener" style="color: var(--color-accent); text-decoration: underline;">$1</a>',
   );
 
-  // Convert newlines to <br> for remaining text
+  // Add paragraph spacing for double newlines
+  formatted = formatted.replace(/\n\n/g, '</p><p style="margin: 12px 0;">');
+
+  // Wrap in paragraphs if not already wrapped
+  if (!formatted.startsWith("<")) {
+    formatted = '<p style="margin: 12px 0;">' + formatted + "</p>";
+  }
+
+  // Convert single newlines to <br>
   formatted = formatted.replace(/\n/g, "<br>");
 
   return formatted;
