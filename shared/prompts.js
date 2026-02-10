@@ -177,9 +177,14 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
           prompt += `[${timestamp.trim()}]\n`;
         }
 
-        // Include up to 1500 chars to give more context
+        // For full documents, include much more content (up to 50k chars)
+        // For search result snippets, limit to 5000 chars
+        const isFullDocument = content.length > 10000;
+        const maxLength = isFullDocument ? 50000 : 5000;
         const truncatedContent =
-          content.length > 1500 ? content.slice(0, 1500) + "..." : content;
+          content.length > maxLength
+            ? content.slice(0, maxLength) + "..."
+            : content;
 
         // Format content with proper line breaks
         const lines = truncatedContent.split("\n").filter((l) => l.trim());
