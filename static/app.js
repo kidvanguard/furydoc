@@ -34,6 +34,28 @@ const state = {
   currentMessages: [],
 };
 
+// Pool of example suggestions - 3 will be randomly selected on each load
+const EXAMPLE_SUGGESTIONS = [
+  { query: "wrestling experience", label: "wrestling experience" },
+  { query: "Thailand and Pattaya", label: "Thailand and Pattaya" },
+  { query: "career sacrifices", label: "career sacrifices" },
+  { query: "Wam Bam character", label: "Wam Bam character" },
+  { query: "family and support", label: "family and support" },
+  { query: "training regimen", label: "training regimen" },
+  { query: "injury and recovery", label: "injury and recovery" },
+  { query: "dreams and goals", label: "dreams and goals" },
+  { query: "life on the road", label: "life on the road" },
+  { query: "memorable matches", label: "memorable matches" },
+  { query: "passion for wrestling", label: "passion for wrestling" },
+  { query: "overcoming obstacles", label: "overcoming obstacles" },
+];
+
+// Get 3 random suggestions from the pool
+function getRandomSuggestions(count = 3) {
+  const shuffled = [...EXAMPLE_SUGGESTIONS].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+}
+
 // DOM Elements
 let elements = {};
 let isResizing = false;
@@ -969,6 +991,15 @@ function renderMessages() {
   elements.messages.innerHTML = "";
 
   if (state.currentMessages.length === 0) {
+    // Get 3 random suggestions
+    const suggestions = getRandomSuggestions(3);
+    const suggestionButtons = suggestions
+      .map(
+        (s) =>
+          `<button class="example-btn" data-query="${s.query}">"${s.label}"</button>`,
+      )
+      .join("");
+
     elements.messages.innerHTML = `
       <div class="welcome-message">
         <div class="welcome-icon">🎬</div>
@@ -977,10 +1008,7 @@ function renderMessages() {
         <div class="example-queries">
           <p>Try asking:</p>
           <div class="examples">
-            <button class="example-btn" data-query="wrestling experience">"wrestling experience"</button>
-            <button class="example-btn" data-query="Thailand and Pattaya">"Thailand and Pattaya"</button>
-            <button class="example-btn" data-query="career sacrifices">"career sacrifices"</button>
-            <button class="example-btn" data-query="Wam Bam character">"Wam Bam character"</button>
+            ${suggestionButtons}
           </div>
         </div>
       </div>
@@ -1291,13 +1319,14 @@ function formatMessage(content) {
   let formatted = content;
 
   // Convert headers (####, ###, ##, #) - MUST process longer patterns first
+  // Apply CSS classes for theme headers and person names
   formatted = formatted.replace(
     /^####\s*(.+)$/gim,
-    '<h4 style="margin: 12px 0 8px 0; color: var(--color-text); font-size: 1.1em; font-weight: 600;">$1</h4>',
+    '<h4 class="person-name">$1</h4>',
   );
   formatted = formatted.replace(
     /^###\s*(.+)$/gim,
-    '<h3 style="margin: 20px 0 12px 0; color: var(--color-accent); border-bottom: 2px solid var(--color-accent); padding-bottom: 6px; font-size: 1.3em; font-weight: 600;">$1</h3>',
+    '<h3 class="theme-header">$1</h3>',
   );
   formatted = formatted.replace(
     /^##\s*(.+)$/gim,
@@ -1308,19 +1337,32 @@ function formatMessage(content) {
     '<h1 style="margin: 28px 0 16px 0; color: var(--color-text); font-size: 1.7em; font-weight: 700;">$1</h1>',
   );
 
-  // Convert **bold** to <strong> (specific styling for filenames)
+  // Convert **bold** to <strong> (specific styling for person names in metadata)
   formatted = formatted.replace(
     /\*\*([^*]+)\*\*/g,
-    '<strong style="color: var(--color-text); font-weight: 600;">$1</strong>',
+    '<strong class="person-name">$1</strong>',
   );
 
-  // Convert `code` (timestamps) to styled spans
+  // Convert `code` (timestamps) to styled spans with subtle styling
   formatted = formatted.replace(
     /`([^`]+)`/g,
-    '<code style="background: var(--color-bg-secondary); color: var(--color-accent); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.9em;">$1</code>',
+    '<span class="metadata timestamp">$1</span>',
   );
 
-  // Convert list items (- or *) at start of line to list items with better styling
+  // Enhance quote lines: pattern like "- Filename | Time: "Quote""
+  // Make the quote text stand out while keeping metadata subtle
+  formatted = formatted.replace(
+    /^([\*\-])\s*([^|]+)\|\s*([^:]+):\s*"([^"]+)"/gm,
+    '<div class="quote-item" style="margin: 12px 0; display: flex; flex-direction: column; gap: 4px;"><div class="metadata"><span class="filename">$2</span> | <span class="timestamp">$3</span></div><span class="quote-text">"$4"</span></div>',
+  );
+
+  // Handle simple quotes without attribution
+  formatted = formatted.replace(
+    /^([\*\-])\s*"([^"]+)"/gm,
+    '<div class="quote-item" style="margin: 8px 0;"><span class="quote-text">"$2"</span></div>',
+  );
+
+  // Convert remaining list items (- or *) at start of line
   formatted = formatted.replace(
     /^[\*\-]\s+(.+)$/gm,
     '<li style="margin: 6px 0; line-height: 1.6;">$1</li>',
@@ -1332,10 +1374,10 @@ function formatMessage(content) {
     "<ul style='margin: 12px 0; padding-left: 24px; list-style-type: disc;'>$1</ul>",
   );
 
-  // Highlight "Context:" lines
+  // Highlight "Context:" lines with elegant styling
   formatted = formatted.replace(
     /^(Context:.+)$/gim,
-    '<p style="color: var(--color-text-secondary); font-style: italic; margin: 8px 0 16px 0; padding: 8px 12px; background: var(--color-bg-secondary); border-radius: 6px; border-left: 3px solid var(--color-accent);">$1</p>',
+    '<p class="context-line">$1</p>',
   );
 
   // Now escape HTML in remaining text (not in tags we just created)
