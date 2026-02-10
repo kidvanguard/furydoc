@@ -4,6 +4,12 @@
 
 set -e
 
+# Parse arguments
+UPDATE_SECRETS=false
+if [ "$1" == "--setup" ] || [ "$1" == "--update-secrets" ]; then
+    UPDATE_SECRETS=true
+fi
+
 echo "🎬 Documentary Research Assistant Deployment"
 echo "============================================="
 
@@ -41,23 +47,29 @@ echo "🔧 Configuration:"
 echo "  Worker name: documentary-research-assistant"
 echo "  Entry point: worker/index.js"
 
-echo ""
-echo "⚙️  Setting up secrets..."
-
-# Prompt for secrets
-read -p "Enter your Elasticsearch endpoint URL: " ES_ENDPOINT
-read -p "Enter your Elasticsearch API key: " ES_API_KEY
-read -p "Enter your OpenRouter API key: " OR_API_KEY
-
-# Store secrets
-echo "  Storing ELASTICSEARCH_ENDPOINT..."
-echo "$ES_ENDPOINT" | wrangler secret put ELASTICSEARCH_ENDPOINT
-
-echo "  Storing ELASTICSEARCH_API_KEY..."
-echo "$ES_API_KEY" | wrangler secret put ELASTICSEARCH_API_KEY
-
-echo "  Storing OPENROUTER_API_KEY..."
-echo "$OR_API_KEY" | wrangler secret put OPENROUTER_API_KEY
+# Only prompt for secrets if --setup flag is passed or if this is first deploy
+if [ "$UPDATE_SECRETS" = true ]; then
+    echo ""
+    echo "⚙️  Setting up secrets..."
+    
+    # Prompt for secrets
+    read -p "Enter your Elasticsearch endpoint URL: " ES_ENDPOINT
+    read -p "Enter your Elasticsearch API key: " ES_API_KEY
+    read -p "Enter your OpenRouter API key: " OR_API_KEY
+    
+    # Store secrets
+    echo "  Storing ELASTICSEARCH_ENDPOINT..."
+    echo "$ES_ENDPOINT" | wrangler secret put ELASTICSEARCH_ENDPOINT
+    
+    echo "  Storing ELASTICSEARCH_API_KEY..."
+    echo "$ES_API_KEY" | wrangler secret put ELASTICSEARCH_API_KEY
+    
+    echo "  Storing OPENROUTER_API_KEY..."
+    echo "$OR_API_KEY" | wrangler secret put OPENROUTER_API_KEY
+else
+    echo ""
+    echo "ℹ️  Using existing secrets (pass --setup to update them)"
+fi
 
 echo ""
 echo "🚀 Deploying worker..."
