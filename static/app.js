@@ -24,7 +24,7 @@ const CONFIG = {
   // Token limits for chunking
   // DeepInfra provider (used by DeepSeek) has 32k token limit
   MAX_TOKENS_PER_REQUEST: 25000, // Leave room for system prompt (~2k) and output (~2k)
-  SAFE_CHUNK_SIZE: 8000, // Process chunks of this size (fits in 32k limit)
+  SAFE_CHUNK_SIZE: 15000, // Increased from 8000 to reduce chunk count
   // Note: buildResultsAnalysisPrompt adds ~10k tokens of overhead (criteria, examples, etc.)
   // So 8k search results + 10k overhead = 18k total, leaving room for system prompt
 
@@ -753,10 +753,15 @@ async function sendMessage() {
         const relatedSearches = getRelatedSearches(content);
         console.log("[DEBUG] Related searches:", relatedSearches);
 
-        // Combine and deduplicate
+        // Combine and deduplicate, limit total searches to prevent performance issues
+        const MAX_SEARCHES = 10;
         allSearches = [
-          ...new Set([content, ...plannedSearches, ...relatedSearches]),
-        ];
+          ...new Set([
+            content,
+            ...plannedSearches.slice(0, 6),
+            ...relatedSearches,
+          ]),
+        ].slice(0, MAX_SEARCHES);
       }
 
       console.log("[DEBUG] Running searches:", allSearches);
@@ -776,11 +781,11 @@ async function sendMessage() {
         searchIndex++;
         console.log(`[DEBUG] Searching: "${searchTerm}"`);
         try {
-          // Use larger size to get more content from throughout the file
+          // Use user-defined result size to control performance
           // If specific filename is set, pass it to filter results
           const results = await searchElasticsearch(
             searchTerm,
-            200,
+            null, // Use user's resultSize setting instead of hardcoded 200
             specificFilename,
           );
           console.log(
@@ -1009,7 +1014,7 @@ async function sendToOpenRouter(query, searchResults) {
 
   // Process chunks with higher concurrency using a promise pool
   // This starts new chunks immediately when slots free up, rather than waiting for entire batches
-  const CONCURRENCY = 10; // Increased from 5 to 10 for faster processing
+  const CONCURRENCY = 15; // Increased from 10 to 15 for faster processing
   const chunkResults = new Array(chunks.length);
   const executing = new Set();
   let completedCount = 0;
