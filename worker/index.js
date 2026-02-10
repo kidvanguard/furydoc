@@ -164,9 +164,19 @@ async function handleSearch(request, env) {
         },
       },
       size: size,
+      _source: [
+        "filename",
+        "speaker",
+        "timestamp",
+        "start_time",
+        "attachment.content",
+      ], // Explicitly get these fields
       highlight: {
         fields: {
-          "attachment.content": {},
+          "attachment.content": {
+            fragment_size: 1000, // Even larger fragments
+            number_of_fragments: 20, // More fragments to get full context
+          },
         },
       },
     };
