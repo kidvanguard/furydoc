@@ -638,13 +638,13 @@ async function sendMessage() {
   showThinking();
 
   try {
-    // Check if query mentions a specific filename
+    // Check if query mentions a specific filename (with or without extension)
     const filenameMatch =
       content.match(
-        /from\s+(?:the\s+)?(?:file\s+)?["']?([^"']+\.(?:txt|vtt|srt))["']?/i,
+        /from\s+(?:the\s+)?(?:file\s+)?["']?([^"']+(?:\.(?:txt|vtt|srt))?)["']?/i,
       ) ||
       content.match(
-        /(?:file|transcript|document)["']?\s*:?\s*["']?([^"']+\.(?:txt|vtt|srt))["']?/i,
+        /(?:file|transcript|document)["']?\s*:?\s*["']?([^"']+(?:\.(?:txt|vtt|srt))?)["']?/i,
       );
 
     let allResults = { hits: [], total: 0 };
@@ -823,7 +823,8 @@ async function searchElasticsearch(query, size) {
 async function fetchFullDocument(filename) {
   console.log(`[DEBUG] Fetching full document for: ${filename}`);
   try {
-    const response = await fetch(`${state.settings.workerUrl}/api/document`, {
+    // Try with the filename as-is first
+    let response = await fetch(`${state.settings.workerUrl}/api/document`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -831,6 +832,19 @@ async function fetchFullDocument(filename) {
         index: state.settings.esIndex || CONFIG.DEFAULT_ES_INDEX,
       }),
     });
+
+    // If not found and no extension, try with .txt extension
+    if (!response.ok && !filename.match(/\.(txt|vtt|srt)$/i)) {
+      console.log(`[DEBUG] Trying with .txt extension...`);
+      response = await fetch(`${state.settings.workerUrl}/api/document`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: filename + ".txt",
+          index: state.settings.esIndex || CONFIG.DEFAULT_ES_INDEX,
+        }),
+      });
+    }
 
     if (!response.ok) {
       console.log(`[DEBUG] Document fetch failed: ${response.status}`);
