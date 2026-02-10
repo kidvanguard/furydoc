@@ -7,7 +7,7 @@ import {
   estimateTokens,
   chunkSearchResults,
   buildChunkCombinationPrompt,
-} from "../shared/prompts.js?v=5";
+} from "../shared/prompts.js?v=6";
 
 const CONFIG = {
   // Password for access (simple shared password - not high security but keeps casual visitors out)
@@ -924,20 +924,38 @@ async function sendToOpenRouter(query, searchResults) {
   const chunks = chunkSearchResults(searchResults, CONFIG.SAFE_CHUNK_SIZE);
   console.log(`[DEBUG] Split into ${chunks.length} chunks`);
 
-  // Process each chunk
-  const chunkResults = [];
-  for (let i = 0; i < chunks.length; i++) {
-    showToast(`Processing chunk ${i + 1} of ${chunks.length}...`, "info");
-    console.log(`[DEBUG] Processing chunk ${i + 1}/${chunks.length}`);
+  // Process chunks in parallel with concurrency limit
+  const CONCURRENCY = 5; // Process 5 chunks at a time
+  const chunkResults = new Array(chunks.length);
 
-    const chunkPrompt = buildPromptWithResults(query, chunks[i]);
-    const chunkPromptTokens = estimateTokens(chunkPrompt);
+  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+    const batch = chunks.slice(i, i + CONCURRENCY);
+    const batchIndices = batch.map((_, idx) => i + idx);
+
+    showToast(
+      `Processing chunks ${i + 1}-${Math.min(i + CONCURRENCY, chunks.length)} of ${chunks.length}...`,
+      "info",
+    );
     console.log(
-      `[DEBUG] Chunk ${i + 1} prompt size: ~${chunkPromptTokens} tokens (${chunkPrompt.length} chars)`,
+      `[DEBUG] Processing chunks ${i + 1}-${Math.min(i + CONCURRENCY, chunks.length)}/${chunks.length} in parallel`,
     );
 
-    const chunkResponse = await sendSingleRequestWithPrompt(chunkPrompt);
-    chunkResults.push(chunkResponse);
+    // Process this batch in parallel
+    const batchPromises = batch.map(async (chunk, idx) => {
+      const chunkIndex = batchIndices[idx];
+      const chunkPrompt = buildPromptWithResults(query, chunk);
+      const chunkPromptTokens = estimateTokens(chunkPrompt);
+      console.log(
+        `[DEBUG] Chunk ${chunkIndex + 1} prompt size: ~${chunkPromptTokens} tokens (${chunkPrompt.length} chars)`,
+      );
+
+      const chunkResponse = await sendSingleRequestWithPrompt(chunkPrompt);
+      chunkResults[chunkIndex] = chunkResponse;
+      console.log(`[DEBUG] Chunk ${chunkIndex + 1}/${chunks.length} completed`);
+      return chunkResponse;
+    });
+
+    await Promise.all(batchPromises);
   }
 
   // If only one chunk, return it directly
