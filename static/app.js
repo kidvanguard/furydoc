@@ -233,7 +233,7 @@ function setupEventListeners() {
     });
   });
 
-  // Close modals
+  // Close modals - only via close button, not clicking outside
   document.querySelectorAll(".modal-close").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const modal = e.target.closest(".modal");
@@ -241,11 +241,7 @@ function setupEventListeners() {
     });
   });
 
-  document.querySelectorAll(".modal").forEach((modal) => {
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) closeModal(modal);
-    });
-  });
+  // Note: Removed click-outside-to-close behavior so modals only close via buttons
 }
 
 function setupKeyboardShortcuts() {
