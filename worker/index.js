@@ -63,35 +63,6 @@ EXCLUDE these even if from matching documents:
 WHEN IN DOUBT, LEAVE IT OUT. A shorter list of highly relevant quotes is better than a long list with irrelevant filler.
 
 REMEMBER: The user wants quality documentary clips about sacrifices, not random quotes from wrestlers.`;
-
-export default {
-  async fetch(request, env, ctx) {
-    // Handle CORS preflight
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: CORS_HEADERS });
-    }
-
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    try {
-      if (path === "/api/search" && request.method === "POST") {
-        return await handleSearch(request, env);
-      }
-
-      if (path === "/api/chat" && request.method === "POST") {
-        return await handleChat(request, env);
-      }
-
-      if (path === "/api/models" && request.method === "GET") {
-        return handleGetModels(env);
-      }
-
-      return new Response("Not Found", {
-        status: 404,
-        headers: CORS_HEADERS,
-      });
-    } catch (error) {
       console.error("Worker error:", error);
       return new Response(
         JSON.stringify({ error: error.message, stack: error.stack }),

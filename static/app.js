@@ -1,9 +1,9 @@
-// Documentary Research Assistant - Main Application
+// Cybersyn - Main Application
 // Features: Password protection, multi-tab chat, ES search, OpenRouter integration
 
 const CONFIG = {
   // Password for access (simple shared password - not high security but keeps casual visitors out)
-  ACCESS_PASSWORD: "documentary2024",
+  ACCESS_PASSWORD: "uncledaddy",
 
   // Default settings
   DEFAULT_WORKER_URL:
@@ -31,6 +31,7 @@ const state = {
 
 // DOM Elements
 let elements = {};
+let isResizing = false;
 
 // Initialize app
 document.addEventListener("DOMContentLoaded", () => {
@@ -40,6 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
   checkAuth();
   setupEventListeners();
   setupKeyboardShortcuts();
+  setupSidebarResize();
 
   // Set default model
   elements.modelSelector.value = CONFIG.DEFAULT_MODEL;
@@ -72,6 +74,11 @@ function initElements() {
     charCount: document.getElementById("char-count"),
     modelSelector: document.getElementById("model-selector"),
 
+    // Sidebar
+    sidebar: document.getElementById("sidebar"),
+    sidebarToggle: document.getElementById("sidebar-toggle"),
+    sidebarResizer: document.getElementById("sidebar-resizer"),
+
     // Settings modal
     settingsModal: document.getElementById("settings-modal"),
     workerUrlInput: document.getElementById("worker-url"),
@@ -97,12 +104,88 @@ function checkAuth() {
   }
 }
 
+function setupSidebarResize() {
+  if (!elements.sidebarResizer) return;
+
+  // Mouse events for resizing
+  elements.sidebarResizer.addEventListener("mousedown", (e) => {
+    isResizing = true;
+    elements.sidebarResizer.classList.add("resizing");
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizing) return;
+    const newWidth = e.clientX;
+    if (newWidth >= 200 && newWidth <= 400) {
+      elements.sidebar.style.width = `${newWidth}px`;
+    }
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (isResizing) {
+      isResizing = false;
+      elements.sidebarResizer.classList.remove("resizing");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+  });
+
+  // Touch events for mobile resizing
+  elements.sidebarResizer.addEventListener("touchstart", (e) => {
+    isResizing = true;
+    elements.sidebarResizer.classList.add("resizing");
+    e.preventDefault();
+  });
+
+  document.addEventListener("touchmove", (e) => {
+    if (!isResizing) return;
+    const touch = e.touches[0];
+    const newWidth = touch.clientX;
+    if (newWidth >= 200 && newWidth <= 400) {
+      elements.sidebar.style.width = `${newWidth}px`;
+    }
+  });
+
+  document.addEventListener("touchend", () => {
+    if (isResizing) {
+      isResizing = false;
+      elements.sidebarResizer.classList.remove("resizing");
+    }
+  });
+}
+
+function toggleSidebar() {
+  elements.sidebar.classList.toggle("open");
+  // Create or remove overlay
+  let overlay = document.querySelector(".sidebar-overlay");
+  if (elements.sidebar.classList.contains("open")) {
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.className = "sidebar-overlay";
+      overlay.addEventListener("click", toggleSidebar);
+      document.body.appendChild(overlay);
+    }
+    setTimeout(() => overlay.classList.add("active"), 10);
+  } else if (overlay) {
+    overlay.classList.remove("active");
+    setTimeout(() => overlay.remove(), 300);
+  }
+}
+
 function setupEventListeners() {
   // Password gate
   elements.passwordSubmit.addEventListener("click", handlePasswordSubmit);
   elements.passwordInput.addEventListener("keypress", (e) => {
     if (e.key === "Enter") handlePasswordSubmit();
   });
+
+  // Sidebar toggle
+  if (elements.sidebarToggle) {
+    elements.sidebarToggle.addEventListener("click", toggleSidebar);
+  }
 
   // Chat
   elements.newChatBtn.addEventListener("click", createNewChat);
@@ -173,9 +256,12 @@ function setupKeyboardShortcuts() {
       createNewChat();
     }
 
-    // Esc = Close modals
+    // Esc = Close modals and sidebar
     if (e.key === "Escape") {
       document.querySelectorAll(".modal").forEach(closeModal);
+      if (elements.sidebar.classList.contains("open")) {
+        toggleSidebar();
+      }
     }
   });
 }
@@ -466,7 +552,11 @@ async function sendMessage() {
   if (chat) {
     chat.messages = [...state.currentMessages];
     chat.model = elements.modelSelector.value;
-    if (chat.title.startsWith("Chat ") && state.currentMessages.length === 1) {
+    if (
+      chat.title &&
+      chat.title.startsWith("Chat ") &&
+      state.currentMessages.length === 1
+    ) {
       chat.title = content.slice(0, 30) + (content.length > 30 ? "..." : "");
     }
   }
@@ -784,7 +874,7 @@ function renderMessages() {
     elements.messages.innerHTML = `
       <div class="welcome-message">
         <div class="welcome-icon">🎬</div>
-        <h2>Welcome to Documentary Research Assistant</h2>
+        <h2>Welcome to Cybersyn</h2>
         <p>Search through your interview transcripts using natural language.</p>
         <div class="example-queries">
           <p>Try asking:</p>
@@ -1180,6 +1270,9 @@ function showToast(message, type = "info") {
     setTimeout(() => toast.remove(), 300);
   }, 3000);
 }
+
+// Make toggleSidebar available globally
+window.toggleSidebar = toggleSidebar;
 
 // Make functions available globally for inline handlers
 window.regenerateResponse = regenerateResponse;

@@ -1,4 +1,4 @@
-/* Documentary Research Assistant - Modern Chat Interface */
+/* Cybersyn - Modern Chat Interface */
 
 :root {
   --color-bg: #0f172a;
@@ -141,17 +141,6 @@ body {
   font-weight: 600;
 }
 
-.beta-badge {
-  font-size: 0.625rem;
-  font-weight: 600;
-  padding: 0.125rem 0.375rem;
-  background: var(--color-accent);
-  color: white;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-}
-
 .header-right {
   display: flex;
   align-items: center;
@@ -167,10 +156,44 @@ body {
 /* Sidebar */
 .sidebar {
   width: 260px;
+  min-width: 200px;
+  max-width: 400px;
   background: var(--color-bg-secondary);
   border-right: 1px solid var(--color-bg-tertiary);
   display: flex;
   flex-direction: column;
+  position: relative;
+  transition:
+    width 0.2s ease,
+    margin-left 0.3s ease;
+}
+
+.sidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-right: none;
+}
+
+.sidebar-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.2s;
+  z-index: 10;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer.resizing {
+  background: var(--color-accent);
+}
+
+.sidebar-toggle {
+  display: none;
 }
 
 .sidebar-header {
@@ -885,6 +908,19 @@ body {
   background: var(--color-text-muted);
 }
 
+/* Sidebar overlay for mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+}
+
+.sidebar-overlay.active {
+  display: block;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .sidebar {
@@ -895,21 +931,110 @@ body {
     transform: translateX(-100%);
     z-index: 100;
     transition: transform 0.3s ease;
+    max-width: 85vw;
+    width: 280px;
   }
 
   .sidebar.open {
     transform: translateX(0);
   }
 
+  .sidebar-resizer {
+    display: none;
+  }
+
+  .sidebar-toggle {
+    display: flex;
+  }
+
   .messages {
     padding: 1rem;
+  }
+
+  .welcome-message {
+    padding: 1.5rem 0.5rem;
+  }
+
+  .welcome-message h2 {
+    font-size: 1.25rem;
+  }
+
+  .examples {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .example-btn {
+    width: 100%;
+    text-align: center;
   }
 
   .input-area {
     padding: 0.75rem 1rem 1rem;
   }
 
+  .input-row {
+    flex-wrap: wrap;
+  }
+
+  .model-selector {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .message {
+    gap: 0.5rem;
+  }
+
+  .message-avatar {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.875rem;
+  }
+
+  .message-body {
+    font-size: 0.875rem;
+  }
+
   .header-left h1 {
+    font-size: 1rem;
+  }
+
+  .app-header {
+    padding: 0.5rem 1rem;
+  }
+
+  .btn-secondary {
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+  }
+
+  .btn-secondary span {
+    display: none;
+  }
+
+  .modal-content {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+  }
+
+  #toast-container {
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+  }
+
+  .toast {
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-left h1 {
+    display: none;
+  }
+
+  .btn-secondary svg + span {
     display: none;
   }
 }

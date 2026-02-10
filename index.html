@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Documentary Research Assistant</title>
+    <title>Cybersyn</title>
     <link rel="stylesheet" href="static/styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
@@ -16,7 +16,7 @@
     <div id="password-gate" class="gate-active">
       <div class="gate-content">
         <div class="gate-logo">🎬</div>
-        <h1>Documentary Research Assistant</h1>
+        <h1>Cybersyn</h1>
         <p class="gate-subtitle">Elasticsearch-powered interview search</p>
         <div class="gate-form">
           <input
@@ -38,9 +38,26 @@
       <!-- Header -->
       <header class="app-header">
         <div class="header-left">
+          <button
+            id="sidebar-toggle"
+            class="btn-icon sidebar-toggle"
+            title="Toggle Sidebar"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <span class="logo">🎬</span>
-          <h1>Research Assistant</h1>
-          <span class="beta-badge">BETA</span>
+          <h1>Cybersyn</h1>
         </div>
         <div class="header-right">
           <button
@@ -100,7 +117,8 @@
 
       <div class="app-container">
         <!-- Sidebar with Tabs -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
+          <div class="sidebar-resizer" id="sidebar-resizer"></div>
           <div class="sidebar-header">
             <h2>Conversations</h2>
           </div>
@@ -132,7 +150,7 @@
           <div id="messages" class="messages">
             <div class="welcome-message">
               <div class="welcome-icon">🎬</div>
-              <h2>Welcome to Documentary Research Assistant</h2>
+              <h2>Welcome to Cybersyn</h2>
               <p>
                 Search through your interview transcripts using natural
                 language.
