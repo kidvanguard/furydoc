@@ -625,6 +625,9 @@ async function planSearches(query) {
 async function sendMessage() {
   const content = elements.messageInput.value.trim();
   console.log("[DEBUG] sendMessage called with:", content);
+  console.log("[TIME] sendMessage started at:", new Date().toISOString());
+  const sendMessageStartTime = performance.now();
+
   if (!content || state.isLoading) return;
 
   // Check if worker URL is configured
@@ -684,17 +687,25 @@ async function sendMessage() {
       );
 
     let allResults = { hits: [], total: 0 };
+    let specificFilename = null;
 
     if (filenameMatch) {
       // User asked for a specific file - fetch the full document
-      const filename = filenameMatch[1].trim();
-      console.log(`[DEBUG] Detected specific file request: ${filename}`);
-      showToast(`Fetching full transcript: ${filename}...`, "info");
+      specificFilename = filenameMatch[1].trim();
+      console.log(
+        `[DEBUG] Detected specific file request: ${specificFilename}`,
+      );
+      showToast(`Fetching full transcript: ${specificFilename}...`, "info");
 
-      const fullDoc = await fetchFullDocument(filename);
+      const docFetchStartTime = performance.now();
+      const fullDoc = await fetchFullDocument(specificFilename);
+      const docFetchEndTime = performance.now();
+      console.log(
+        `[TIME] Document fetch took ${(docFetchEndTime - docFetchStartTime).toFixed(0)}ms`,
+      );
       if (fullDoc && fullDoc.content) {
         allResults.hits.push({
-          filename: fullDoc.filename || filename,
+          filename: fullDoc.filename || specificFilename,
           content: fullDoc.content,
           speaker: fullDoc.speaker || "",
           timestamp: fullDoc.timestamp || "",
@@ -711,32 +722,63 @@ async function sendMessage() {
     }
 
     // If no specific file or fetch failed, do regular search
+    // If specific file was requested, only search within that file
     if (allResults.total === 0) {
-      // Step 1: Ask LLM to plan the searches
-      showToast("Planning searches with AI...", "info");
-      const plannedSearches = await planSearches(content);
-      console.log("[DEBUG] Planned searches:", plannedSearches);
+      // Step 1: Ask LLM to plan the searches (skip if searching specific file)
+      let allSearches;
 
-      // Also get related searches from our predefined list
-      const relatedSearches = getRelatedSearches(content);
-      console.log("[DEBUG] Related searches:", relatedSearches);
+      if (specificFilename) {
+        // For specific file, just use the original query and some targeted variations
+        allSearches = [
+          content,
+          "good quotes",
+          "memorable moments",
+          "key insights",
+        ];
+        console.log(
+          "[DEBUG] Searching within specific file:",
+          specificFilename,
+        );
+        showToast(`Searching within ${specificFilename}...`, "info");
+      } else {
+        showToast("Planning searches with AI...", "info");
+        const plannedSearches = await planSearches(content);
+        console.log("[DEBUG] Planned searches:", plannedSearches);
 
-      // Combine and deduplicate
-      const allSearches = [
-        ...new Set([content, ...plannedSearches, ...relatedSearches]),
-      ];
+        // Also get related searches from our predefined list
+        const relatedSearches = getRelatedSearches(content);
+        console.log("[DEBUG] Related searches:", relatedSearches);
+
+        // Combine and deduplicate
+        allSearches = [
+          ...new Set([content, ...plannedSearches, ...relatedSearches]),
+        ];
+      }
 
       console.log("[DEBUG] Running searches:", allSearches);
-      showToast(`Running ${allSearches.length} searches...`, "info");
+      console.log(`[TIME] Starting ${allSearches.length} searches`);
+      const searchesStartTime = performance.now();
+
+      if (!specificFilename) {
+        showToast(`Running ${allSearches.length} searches...`, "info");
+      }
 
       // Step 2: Run all searches
       const seenContent = new Set(); // Track seen content to avoid duplicates across files
+      let searchIndex = 0;
 
       for (const searchTerm of allSearches) {
+        const searchStartTime = performance.now();
+        searchIndex++;
         console.log(`[DEBUG] Searching: "${searchTerm}"`);
         try {
           // Use larger size to get more content from throughout the file
-          const results = await searchElasticsearch(searchTerm, 200);
+          // If specific filename is set, pass it to filter results
+          const results = await searchElasticsearch(
+            searchTerm,
+            200,
+            specificFilename,
+          );
           console.log(
             `[DEBUG] Found ${results.hits?.length || 0} hits for "${searchTerm}"`,
           );
@@ -758,6 +800,25 @@ async function sendMessage() {
               }
             }
 
+            // If searching specific file, skip results from other files
+            if (specificFilename) {
+              const normalizedHitFilename = filename
+                .toLowerCase()
+                .replace(/\.[^/.]+$/, "");
+              const normalizedSpecificFilename = specificFilename
+                .toLowerCase()
+                .replace(/\.[^/.]+$/, "");
+              if (
+                !normalizedHitFilename.includes(normalizedSpecificFilename) &&
+                !normalizedSpecificFilename.includes(normalizedHitFilename)
+              ) {
+                console.log(
+                  `[DEBUG] Skipping result from different file: ${filename}`,
+                );
+                continue;
+              }
+            }
+
             // Create a content signature to avoid duplicate chunks
             const contentSig = `${filename}:${(hit.content || "").slice(0, 200)}`;
             if (!seenContent.has(contentSig)) {
@@ -775,6 +836,11 @@ async function sendMessage() {
           console.error(`[DEBUG] Search failed for "${searchTerm}":`, e);
         }
       }
+
+      const searchesEndTime = performance.now();
+      console.log(
+        `[TIME] All ${allSearches.length} searches completed in ${(searchesEndTime - searchesStartTime).toFixed(0)}ms`,
+      );
     }
 
     console.log(`[DEBUG] Total unique results: ${allResults.total}`);
@@ -833,18 +899,23 @@ async function sendMessage() {
   }
 }
 
-async function searchElasticsearch(query, size) {
+async function searchElasticsearch(query, size, filenameFilter = null) {
+  const requestBody = {
+    query,
+    index: state.settings.esIndex || CONFIG.DEFAULT_ES_INDEX,
+    size:
+      size || parseInt(state.settings.resultSize) || CONFIG.DEFAULT_RESULT_SIZE,
+  };
+
+  // Add filename filter if specified
+  if (filenameFilter) {
+    requestBody.filename = filenameFilter;
+  }
+
   const response = await fetch(`${state.settings.workerUrl}/api/search`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query,
-      index: state.settings.esIndex || CONFIG.DEFAULT_ES_INDEX,
-      size:
-        size ||
-        parseInt(state.settings.resultSize) ||
-        CONFIG.DEFAULT_RESULT_SIZE,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
@@ -899,6 +970,9 @@ async function fetchFullDocument(filename) {
 }
 
 async function sendToOpenRouter(query, searchResults) {
+  console.log("[TIME] Starting LLM processing");
+  const llmStartTime = performance.now();
+
   // Build the full prompt to check token count
   const fullPrompt = buildPromptWithResults(query, searchResults);
   const estimatedTokens = estimateTokens(fullPrompt);
@@ -910,7 +984,12 @@ async function sendToOpenRouter(query, searchResults) {
     console.log(
       "[DEBUG] Prompt within token limits, sending as single request",
     );
-    return await sendSingleRequest(query, searchResults);
+    const result = await sendSingleRequest(query, searchResults);
+    const llmEndTime = performance.now();
+    console.log(
+      `[TIME] LLM processing (single request) completed in ${(llmEndTime - llmStartTime).toFixed(0)}ms`,
+    );
+    return result;
   }
 
   // Otherwise, chunk the search results
@@ -972,7 +1051,12 @@ async function sendToOpenRouter(query, searchResults) {
     chunkResults,
     chunks.length,
   );
-  return await sendSingleRequestWithPrompt(combinationPrompt);
+  const result = await sendSingleRequestWithPrompt(combinationPrompt);
+  const llmEndTime = performance.now();
+  console.log(
+    `[TIME] LLM processing completed in ${(llmEndTime - llmStartTime).toFixed(0)}ms`,
+  );
+  return result;
 }
 
 async function sendSingleRequest(query, searchResults) {
