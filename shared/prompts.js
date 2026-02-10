@@ -34,32 +34,24 @@ EXAMPLE:
 If the query is "career sacrifices" and transcript shows relevant content at "Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760", your output should be:
 - Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760: "quote about sacrifices here"
 
-EMOTIONAL IMPACT CHECK: Before including any quote, ask yourself: "Does this quote ACTUALLY discuss the query topic?" 
+EMOTIONAL IMPACT CHECK: Before including any quote, ask yourself: "Does this quote have emotional resonance or tell a compelling story?"
 
-FOR "career sacrifices" ONLY INCLUDE quotes about:
-- Financial struggles, debt, low pay
-- Leaving family/home behind
-- Physical pain, injuries from training
-- Giving up stable jobs/opportunities
-- Working long hours without rest
-- Moving countries for wrestling
-- Family not understanding/supporting the career
-- Missing important life events for wrestling
+INCLUDE quotes that show:
+- Personal struggles, sacrifices, or challenges faced
+- Emotional turning points or revelations
+- Specific moments with sensory details
+- Character revealed through actions and experiences
+- Universal themes (identity, belonging, passion, loss)
+- Authentic voice and personal perspective
 
-EXCLUDE these even if from matching documents:
-- Weather reports (rain, flooding)
-- Event logistics (show postponed, setup issues)
-- Bio introductions ("I'm the founder", "My name is")
-- Generic career summaries without sacrifice details
-- Technical problems (sound checks, equipment)
-- Goals and ambitions ("I want to wrestle in WWE")
-- Match descriptions/injuries during shows
-- Audience experience descriptions
-- Complaints about minor inconveniences
+EXCLUDE:
+- Weather reports, event logistics, technical problems
+- Empty pleasantries and standalone agreement words
+- Repetitive statements that don't add new information
 
-WHEN IN DOUBT, INCLUDE IT if it has emotional resonance. A shorter list of highly relevant quotes is better than a long list with irrelevant filler.
+WHEN IN DOUBT, INCLUDE IT if it reveals character or has emotional weight. Better to give the user meaningful content they can choose from than to be overly restrictive.
 
-REMEMBER: The user wants EMOTIONALLY COMPELLING quotes that would work in a documentary trailer.`;
+REMEMBER: The user wants COMPELLING quotes that reveal something true about the person. Don't reject good content because it doesn't meet an artificially high "trailer-worthy" bar.`;
 
 /**
  * Prompt for planning search queries based on user's research question
@@ -127,44 +119,33 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
     prompt += `- Copy EXACT timestamps from [BRACKETS] below\n`;
     prompt += `- Format: - **Filename** | \`timestamp\`: "Quote"\n\n`;
   } else {
-    prompt += `=== DOCUMENTARY EDITOR DIRECTIVE ===\n`;
-    prompt += `You are selecting quotes for a FEATURE DOCUMENTARY. These will appear on screen. Every quote must be TRAILER-WORTHY.\n\n`;
-    prompt += `THE BAR IS HIGH:\n`;
-    prompt += `- Would this quote make a stranger CARE about this person in 10 seconds?\n`;
-    prompt += `- Does it reveal something unexpected about human nature?\n`;
-    prompt += `- Would you remember it tomorrow?\n\n`;
-    prompt += `REQUIRED ELEMENTS (must check at least 3 boxes):\n`;
-    prompt += `☐ NARRATIVE ARC - Beginning, middle, END (transformation/resolution)\n`;
-    prompt += `☐ EMOTIONAL RAWNESS - Fear, shame, triumph, grief, longing (not just "happy")\n`;
-    prompt += `☐ SPECIFIC SENSORY DETAILS - Numbers, colors, physical sensations, exact moments\n`;
-    prompt += `☐ SUBVERSION - Challenges expectations or reveals hidden truth\n`;
-    prompt += `☐ UNIVERSAL STAKES - Life/death, love/loss, identity, belonging\n`;
-    prompt += `☐ AUTHENTIC MESSINESS - Interrupts self, uses wrong words, laughs mid-cry\n\n`;
-    prompt += `=== AUTOMATIC REJECTION LIST ===\n`;
-    prompt += `These will NEVER make the cut. Skip them entirely:\n\n`;
-    prompt += `🚫 JOB TITLES: "I'm the founder/owner/director/president of..."\n`;
-    prompt += `🚫 NAME/AGE ORIGIN: "My name is..." / "I'm 28 years old from..."\n`;
-    prompt += `🚫 TECH CHECKS: "Can you hear me?" / "Is this on?" / "Testing one two"\n`;
-    prompt += `🚫 EMPTY AGREEMENT: "Yeah" / "Sure" / "Okay" / "Right" / "Exactly" (alone)\n`;
-    prompt += `🚫 SOCIAL PLATITUDES: "Follow your dreams" / "Never give up" (generic)\n`;
-    prompt += `🚫 PROMO MENTIONS: Social handles, website URLs, "check us out"\n`;
-    prompt += `🚫 SURFACE BIO: "I started wrestling 5 years ago" (fact without story)\n`;
-    prompt += `🚫 REPETITION: Same idea rephrased slightly differently\n\n`;
-    prompt += `=== GOLD STANDARD EXAMPLES ===\n\n`;
+    prompt += `=== QUOTE SELECTION CRITERIA ===\n\n`;
+    prompt += `GOOD QUOTES SHOW:\n`;
+    prompt += `- Personal stories with emotional depth (struggles, triumphs, revelations)\n`;
+    prompt += `- Specific moments and details (not generic statements)\n`;
+    prompt += `- Character revealed through action or experience\n`;
+    prompt += `- Authentic voice - how they actually talk, not polished PR speak\n`;
+    prompt += `- Narrative arc - beginning, middle, transformation\n`;
+    prompt += `- Universal themes (identity, belonging, sacrifice, passion)\n\n`;
+    prompt += `ALWAYS EXCLUDE:\n`;
+    prompt += `- Technical checks: "Can you hear me?" / "Is this on?" / "Testing one two"\n`;
+    prompt += `- Empty agreements: standalone "Yeah" / "Sure" / "Okay" / "Right"\n`;
+    prompt += `- Repetition: Same idea rephrased multiple times\n\n`;
+    prompt += `INCLUDE THESE IF THEY TELL A STORY:\n`;
+    prompt += `- Introductions that reveal something unique (not just name/age)\n`;
+    prompt += `- Job titles IF they explain the meaning behind the role\n`;
+    prompt += `- Background IF it has emotional weight or unusual details\n\n`;
+    prompt += `EXAMPLES:\n\n`;
     prompt += `QUERY: "career sacrifices"\n\n`;
-    prompt += `❌ REJECT: "I'm the owner of Z Afterland Wrestling."\n`;
-    prompt += `   Why: Just a label. Zero emotion. Anyone could say this.\n\n`;
-    prompt += `✅ SELECT: "I remember sitting in my car outside the bank, holding the foreclosure notice. My daughter's gymnastics photo was on the dashboard. I thought: 'I'm either going to lose this house or I'm going to lose my mind trying to save it.' So I started the wrestling school in my garage the next morning."\n`;
-    prompt += `   Why: Specific moment (car, bank, photo), emotional stakes (house vs sanity), transformation (decision to act), sensory details (holding paper, dashboard photo)\n\n`;
-    prompt += `❌ REJECT: "Yeah, wrestling is my passion. I've always loved it."\n`;
-    prompt += `   Why: Generic. Could be about anything. No story, no stakes.\n\n`;
-    prompt += `✅ SELECT: "The doctor said I'd never wrestle again after the third concussion. I lied to my wife about the headaches. Lied to my kids about why I was crying in the shower. Then I found a doctor who'd clear me and I was back in the ring three months later. I don't know if that makes me dedicated or broken. Probably both."\n`;
-    prompt += `   Why: Conflict (medical vs desire), moral complexity (lying to family), self-awareness (dedicated or broken?), specific details (third concussion, three months)\n\n`;
-    prompt += `=== SELECTION CRITERIA ===\n`;
-    prompt += `• Pick 3-5 quotes MAXIMUM. Better to return 2 incredible quotes than 7 mediocre ones.\n`;
-    prompt += `• If you find NOTHING that meets the bar, say: "No trailer-worthy quotes found in this file."\n`;
-    prompt += `• Combine adjacent moments if needed to build a complete arc.\n`;
-    prompt += `• Prioritize quotes where the person contradicts themselves, reveals hypocrisy, or admits something shameful.\n\n`;
+    prompt += `❌ WEAK: "I'm the owner of Z Afterland Wrestling." (just a label)\n`;
+    prompt += `✅ STRONG: "I have about one million debt when I was 19... I spend from that time until now to prove myself to my parents that I can make this a job." (specific stakes, personal struggle)\n\n`;
+    prompt += `❌ WEAK: "Yeah, wrestling is my passion." (generic)\n`;
+    prompt += `✅ STRONG: "I was forced to watch wrestling since I was two... It feels like wrestling is a big part of our family times." (specific memory, emotional connection)\n\n`;
+    prompt += `=== SELECTION GUIDELINES ===\n`;
+    prompt += `• Return 5-15 quotes depending on content richness\n`;
+    prompt += `• If the file has limited content, return what you find with a note\n`;
+    prompt += `• Combine adjacent moments to build complete thoughts\n`;
+    prompt += `• Prioritize quotes with emotional resonance and specific details\n\n`;
     prompt += `=== TIMESTAMPS (copy EXACTLY from [BRACKETS] below) ===\n`;
     prompt += `Format: - **Filename** | \`timestamp\`: "Quote"\n`;
     prompt += `WARNING: Invented timestamps will be caught and rejected.\n\n`;
