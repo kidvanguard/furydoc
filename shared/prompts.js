@@ -177,10 +177,10 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
           prompt += `[${timestamp.trim()}]\n`;
         }
 
-        // For full documents, include much more content (up to 50k chars)
-        // For search result snippets, limit to 5000 chars
-        const isFullDocument = content.length > 10000;
-        const maxLength = isFullDocument ? 50000 : 5000;
+        // Limit content to avoid exceeding LLM token limits
+        // Rough estimate: 1 token ≈ 4 characters for English text
+        // Target: ~40k tokens max for content = ~160k chars
+        const maxLength = 40000;
         const truncatedContent =
           content.length > maxLength
             ? content.slice(0, maxLength) + "..."
