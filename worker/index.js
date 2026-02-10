@@ -119,12 +119,12 @@ async function handleSearch(request, env) {
         "timestamp",
         "start_time",
         "attachment.content",
-      ], // Explicitly get these fields
+      ],
       highlight: {
         fields: {
           "attachment.content": {
-            fragment_size: 1000, // Even larger fragments
-            number_of_fragments: 20, // More fragments to get full context
+            fragment_size: 1000,
+            number_of_fragments: 20,
           },
         },
       },
@@ -215,14 +215,16 @@ async function handleGetDocument(request, env) {
       );
     }
 
-    // Search for document by filename
+    // Search for ALL chunks of this document by filename
+    // Documents may be split into multiple records, so we fetch up to 100 chunks
     const esQuery = {
       query: {
         term: {
           filename: filename,
         },
       },
-      size: 1,
+      size: 100, // Fetch up to 100 chunks
+      sort: [{ timestamp: "asc" }, { start_time: "asc" }], // Sort chronologically
       _source: [
         "filename",
         "speaker",
@@ -233,7 +235,7 @@ async function handleGetDocument(request, env) {
     };
 
     const esUrl = `${env.ELASTICSEARCH_ENDPOINT}/${index}/_search`;
-    console.log("Fetching document:", filename);
+    console.log("Fetching document chunks:", filename);
 
     const response = await fetch(esUrl, {
       method: "POST",
@@ -267,16 +269,30 @@ async function handleGetDocument(request, env) {
       });
     }
 
-    const hit = data.hits.hits[0];
-    const content =
-      hit._source.attachment?.content || hit._source.content || "";
+    // Concatenate all chunks into a single document
+    let fullContent = "";
+    let firstHit = data.hits.hits[0];
+
+    for (const hit of data.hits.hits) {
+      const chunkContent =
+        hit._source.attachment?.content || hit._source.content || "";
+      if (chunkContent) {
+        fullContent += chunkContent + "\n";
+      }
+    }
+
+    console.log(
+      `Fetched ${data.hits.hits.length} chunks, total content: ${fullContent.length} chars`,
+    );
 
     return new Response(
       JSON.stringify({
-        filename: hit._source.filename,
-        content: content,
-        speaker: hit._source.speaker || "",
-        timestamp: hit._source.timestamp || hit._source.start_time || "",
+        filename: firstHit._source.filename,
+        content: fullContent,
+        speaker: firstHit._source.speaker || "",
+        timestamp:
+          firstHit._source.timestamp || firstHit._source.start_time || "",
+        chunks: data.hits.hits.length,
       }),
       {
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
