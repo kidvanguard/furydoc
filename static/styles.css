@@ -249,6 +249,13 @@ body {
   transition: var(--transition);
   padding: 0.25rem;
   border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .chat-tab:hover .chat-tab-close {
@@ -256,7 +263,8 @@ body {
 }
 
 .chat-tab-close:hover {
-  background: var(--color-bg);
+  color: var(--color-error);
+  background: rgba(239, 68, 68, 0.1);
 }
 
 .sidebar-footer {
