@@ -1,4 +1,4 @@
-// Shared prompts for Documentary Research Assistant
+view; // Shared prompts for Documentary Research Assistant
 // This file is imported by both the worker and frontend
 
 /**
@@ -89,6 +89,74 @@ Respond with ONLY a JSON array of 6-10 specific, emotionally-focused search term
 }
 
 /**
+ * Detects which portion of the transcript the user wants to analyze
+ * Returns: 'start' | 'middle' | 'end' | 'all'
+ */
+function detectQueryPortion(query) {
+  const lowerQuery = query.toLowerCase();
+
+  // End/last portion indicators
+  if (
+    /\b(end|ending|last|final|later|conclusion|wrap up|finish)\b/.test(
+      lowerQuery,
+    ) ||
+    /\b(last \d+ minutes?|final \d+ minutes?)\b/.test(lowerQuery)
+  ) {
+    return "end";
+  }
+
+  // Middle portion indicators
+  if (/\b(middle|center|halfway)\b/.test(lowerQuery)) {
+    return "middle";
+  }
+
+  // Start/beginning indicators
+  if (
+    /\b(start|beginning|first|early|opening)\b/.test(lowerQuery) ||
+    /\b(first \d+ minutes?|opening \d+ minutes?)\b/.test(lowerQuery)
+  ) {
+    return "start";
+  }
+
+  return "all";
+}
+
+/**
+ * Extracts a specific portion of content based on the query
+ */
+function extractContentPortion(content, portion, maxLength = 40000) {
+  if (content.length <= maxLength || portion === "all") {
+    return content.slice(0, maxLength);
+  }
+
+  const totalLength = content.length;
+
+  switch (portion) {
+    case "start":
+      // First portion (already default)
+      return content.slice(0, maxLength);
+
+    case "end":
+      // Last portion
+      return (
+        "... [Content skipped from middle] ...\n\n" + content.slice(-maxLength)
+      );
+
+    case "middle":
+      // Middle portion
+      const startPos = Math.floor((totalLength - maxLength) / 2);
+      return (
+        "... [Beginning skipped] ...\n\n" +
+        content.slice(startPos, startPos + maxLength) +
+        "\n\n... [End skipped] ..."
+      );
+
+    default:
+      return content.slice(0, maxLength);
+  }
+}
+
+/**
  * Builds the final user prompt with search results for the LLM to analyze
  */
 export function buildResultsAnalysisPrompt(query, searchResults) {
@@ -101,6 +169,9 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
   const wantsTechnical = /tech|setup|audio|mic|sound check|preparation/.test(
     lowerQuery,
   );
+
+  // Detect which portion of the transcript to analyze
+  const queryPortion = detectQueryPortion(query);
 
   let prompt = `QUERY: "${query}"\n\n`;
 
@@ -165,6 +236,12 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
     prompt += `TRANSCRIPT CONTENT (timestamps in [BRACKETS] before each section):\n`;
     prompt += `==========================\n\n`;
 
+    // Add note about which portion is being analyzed
+    if (queryPortion !== "all") {
+      prompt += `NOTE: Showing ${queryPortion.toUpperCase()} portion of transcript (due to length limits).\n`;
+      prompt += `To see other portions, ask for "${queryPortion === "start" ? "end" : "start"} of [filename]"\n\n`;
+    }
+
     Object.entries(fileGroups).forEach(([filename, hits]) => {
       prompt += `FILE: "${filename}"\n`;
 
@@ -181,10 +258,11 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
         // Rough estimate: 1 token ≈ 4 characters for English text
         // Target: ~40k tokens max for content = ~160k chars
         const maxLength = 40000;
-        const truncatedContent =
-          content.length > maxLength
-            ? content.slice(0, maxLength) + "..."
-            : content;
+        const truncatedContent = extractContentPortion(
+          content,
+          queryPortion,
+          maxLength,
+        );
 
         // Format content with proper line breaks
         const lines = truncatedContent.split("\n").filter((l) => l.trim());
