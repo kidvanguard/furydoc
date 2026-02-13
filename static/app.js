@@ -19,7 +19,7 @@ const CONFIG = {
   DEFAULT_ES_INDEX: "furytranscripts",
   DEFAULT_MODEL: "deepseek/deepseek-chat",
   DEFAULT_TEMPERATURE: 0.7,
-  DEFAULT_RESULT_SIZE: 100,
+  DEFAULT_RESULT_SIZE: 20,
 
   // Token limits for chunking
   // DeepInfra provider (used by DeepSeek) has 32k token limit

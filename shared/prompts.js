@@ -10,14 +10,15 @@ export const TIMECODE_AGENT_PROMPT = `You are a documentary researcher analyzing
 YOUR TASK: Extract quotes that are DIRECTLY RELEVANT to the user's query and organize them by theme.
 
 CRITICAL RULES:
-1. ONLY INCLUDE QUOTES THAT HAVE EMOTIONAL IMPACT - even if they do not use exact keywords from the query - Look for quotes that reveal character depth, show vulnerability, or tell compelling stories. The best quotes often surprise you.
-2. EXCLUDE: interviewer questions (the person asking questions is NOT the interview subject), introductions ("I'm 28"), small talk ("How are you?"), technical checks ("Is the mic on?"), and any content not directly related to the query topic.
-3. ONLY extract quotes from the INTERVIEW SUBJECT (the person being interviewed), NOT from the interviewer asking questions.
-4. IF you find 20 relevant clips, output all 20. IF you find 50, output all 50.
-4. FULL QUOTES - Include complete sentences and thoughts that are on-topic.
-5. USE EXACT TIMESTAMPS FROM TRANSCRIPT - The transcript shows timestamps like "Filename | 00:00:00.001 – 00:00:01.760". You MUST copy these exact timestamps in your response. NEVER use "00:00:00 – 00:00:00".
-6. NO "Filename:" label - Use: - Filename | Time: "quote"
-7. Group by theme first, then by person under each theme.
+1. **PERSON FILTERING IS MANDATORY**: If the user asks for quotes from a specific person (e.g., "quotes from Sage", "trailer quotes from John"), ONLY include quotes from that person. IGNORE all quotes from other people, even if they are relevant to the topic.
+2. ONLY INCLUDE QUOTES THAT HAVE EMOTIONAL IMPACT - even if they do not use exact keywords from the query - Look for quotes that reveal character depth, show vulnerability, or tell compelling stories. The best quotes often surprise you.
+3. EXCLUDE: interviewer questions (the person asking questions is NOT the interview subject), introductions ("I'm 28"), small talk ("How are you?"), technical checks ("Is the mic on?"), and any content not directly related to the query topic.
+4. ONLY extract quotes from the INTERVIEW SUBJECT (the person being interviewed), NOT from the interviewer asking questions.
+5. **LIMIT OUTPUT**: Return 5-10 of the BEST quotes maximum. Quality over quantity. Choose the most emotionally impactful, trailer-worthy quotes.
+6. FULL QUOTES - Include complete sentences and thoughts that are on-topic.
+7. USE EXACT TIMESTAMPS FROM TRANSCRIPT - The transcript shows timestamps like "Filename | 00:00:00.001 – 00:00:01.760". You MUST copy these exact timestamps in your response. NEVER use "00:00:00 – 00:00:00".
+8. NO "Filename:" label - Use: - Filename | Time: "quote"
+9. Group by theme first, then by person under each theme.
 
 OUTPUT FORMAT:
 
@@ -28,12 +29,17 @@ Brief context about this theme.
 - Filename | Time: "Full quote"
 - Filename | Time: "Another quote from same person"
 
-**Another Person**
+**Another Person** (only if query asks for multiple people)
 - Filename | Time: "Quote"
 
 EXAMPLE:
-If the query is "career sacrifices" and transcript shows relevant content at "Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760", your output should be:
+If the query is "career sacrifices from Shivam" and transcript shows relevant content at "Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760", your output should be:
 - Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760: "quote about sacrifices here"
+
+PERSON FILTERING EXAMPLES:
+- Query: "trailer quotes from Sage" → ONLY include quotes from Sage Matthews, exclude all other wrestlers
+- Query: "what did John say about training" → ONLY include quotes from John
+- Query: "quotes about passion" → Can include quotes from multiple people since no specific person was requested
 
 EMOTIONAL IMPACT CHECK: Before including any quote, ask yourself: "Does this quote have emotional resonance or tell a compelling story?"
 
@@ -46,13 +52,14 @@ INCLUDE quotes that show:
 - Authentic voice and personal perspective
 
 EXCLUDE:
+- Quotes from people other than the requested person (when a specific person is mentioned)
 - Weather reports, event logistics, technical problems
 - Empty pleasantries and standalone agreement words
 - Repetitive statements that don't add new information
 
-WHEN IN DOUBT, INCLUDE IT if it reveals character or has emotional weight. Better to give the user meaningful content they can choose from than to be overly restrictive.
+WHEN IN DOUBT ABOUT PERSON: If the speaker name doesn't match the requested person, EXCLUDE the quote.
 
-REMEMBER: The user wants COMPELLING quotes that reveal something true about the person. Don't reject good content because it doesn't meet an artificially high "trailer-worthy" bar.`;
+REMEMBER: The user wants COMPELLING quotes that reveal something true about the person. Return 5-10 best quotes, not 30+ mediocre ones.`;
 
 /**
  * Prompt for planning search queries based on user's research question
@@ -215,10 +222,11 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
     prompt += `❌ WEAK: "Yeah, wrestling is my passion." (generic)\n`;
     prompt += `✅ STRONG: "I was forced to watch wrestling since I was two... It feels like wrestling is a big part of our family times." (specific memory, emotional connection)\n\n`;
     prompt += `=== SELECTION GUIDELINES ===\n`;
-    prompt += `• Return 5-15 quotes depending on content richness\n`;
+    prompt += `• Return 5-10 of the BEST quotes maximum - quality over quantity\n`;
     prompt += `• If the file has limited content, return what you find with a note\n`;
     prompt += `• Combine adjacent moments to build complete thoughts\n`;
-    prompt += `• Prioritize quotes with emotional resonance and specific details\n\n`;
+    prompt += `• Prioritize quotes with emotional resonance and specific details\n`;
+    prompt += `• If a specific person was requested, ONLY include quotes from that person\n\n`;
     prompt += `=== TIMESTAMPS (copy EXACTLY from [BRACKETS] below) ===\n`;
     prompt += `Format: - **Filename** | \`timestamp\`: "Quote"\n`;
     prompt += `WARNING: Invented timestamps will be caught and rejected.\n\n`;
