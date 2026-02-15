@@ -42,6 +42,18 @@ const state = {
   settings: {},
   isLoading: false,
   currentMessages: [],
+  currentStatus: "",
+};
+
+// Status messages for each phase of the search process
+const STATUS_PHASES = {
+  PLANNING: "Planning searches with AI...",
+  FETCHING_DOC: (filename) => `Fetching transcript: ${filename}...`,
+  SEARCHING_SPECIFIC: (filename) => `Searching within ${filename}...`,
+  RUNNING_SEARCHES: (count) => `Running ${count} searches...`,
+  ANALYZING: (count) => `Found ${count} unique clips, analyzing...`,
+  PROCESSING_CHUNKS: (count, total) => `Processed ${count}/${total} chunks...`,
+  COMBINING: "Combining results from all chunks...",
 };
 
 // Pool of example suggestions - 3 will be randomly selected on each load
@@ -699,7 +711,7 @@ async function sendMessage() {
       console.log(
         `[DEBUG] Detected specific file request: ${specificFilename}`,
       );
-      showToast(`Fetching full transcript: ${specificFilename}...`, "info");
+      updateStatus(STATUS_PHASES.FETCHING_DOC(specificFilename));
 
       const docFetchStartTime = performance.now();
       const fullDoc = await fetchFullDocument(specificFilename);
@@ -743,9 +755,9 @@ async function sendMessage() {
           "[DEBUG] Searching within specific file:",
           specificFilename,
         );
-        showToast(`Searching within ${specificFilename}...`, "info");
+        updateStatus(STATUS_PHASES.SEARCHING_SPECIFIC(specificFilename));
       } else {
-        showToast("Planning searches with AI...", "info");
+        updateStatus(STATUS_PHASES.PLANNING);
         const plannedSearches = await planSearches(content);
         console.log("[DEBUG] Planned searches:", plannedSearches);
 
@@ -769,7 +781,7 @@ async function sendMessage() {
       const searchesStartTime = performance.now();
 
       if (!specificFilename) {
-        showToast(`Running ${allSearches.length} searches...`, "info");
+        updateStatus(STATUS_PHASES.RUNNING_SEARCHES(allSearches.length));
       }
 
       // Step 2: Run all searches
@@ -856,7 +868,7 @@ async function sendMessage() {
     console.log("[DEBUG] Files found:", [
       ...new Set(allResults.hits.map((h) => h.filename)),
     ]);
-    showToast(`Found ${allResults.total} unique clips, analyzing...`, "info");
+    updateStatus(STATUS_PHASES.ANALYZING(allResults.total));
 
     // Step 3: Send to OpenRouter for final organization
     const promptPreview = buildPromptWithResults(content, allResults).slice(
@@ -1003,9 +1015,8 @@ async function sendToOpenRouter(query, searchResults) {
 
   // Otherwise, chunk the search results
   console.log("[DEBUG] Prompt exceeds token limits, using chunked processing");
-  showToast(
+  updateStatus(
     `Content is large (${estimatedTokens.toLocaleString()} tokens). Processing in chunks...`,
-    "info",
   );
 
   // Chunk the search results
@@ -1039,11 +1050,10 @@ async function sendToOpenRouter(query, searchResults) {
         `[DEBUG] Chunk ${index + 1}/${chunks.length} completed in ${(chunkEndTime - chunkStartTime).toFixed(0)}ms (${completedCount}/${chunks.length} total)`,
       );
 
-      // Update toast less frequently (every 5 chunks or on last chunk)
+      // Update status less frequently (every 5 chunks or on last chunk)
       if (completedCount % 5 === 0 || completedCount === chunks.length) {
-        showToast(
-          `Processed ${completedCount}/${chunks.length} chunks...`,
-          "info",
+        updateStatus(
+          STATUS_PHASES.PROCESSING_CHUNKS(completedCount, chunks.length),
         );
       }
 
@@ -1083,7 +1093,7 @@ async function sendToOpenRouter(query, searchResults) {
   }
 
   // Combine chunk results
-  showToast("Combining results from all chunks...", "info");
+  updateStatus(STATUS_PHASES.COMBINING);
   console.log("[DEBUG] Combining chunk results");
 
   const combinationPrompt = buildChunkCombinationPrompt(
@@ -1330,26 +1340,41 @@ function renderMessages() {
 }
 
 function showThinking() {
+  state.currentStatus = "Thinking...";
   const thinkingEl = document.createElement("div");
   thinkingEl.className = "message assistant thinking";
   thinkingEl.id = "thinking-indicator";
   thinkingEl.innerHTML = `
     <div class="message-avatar">🤖</div>
     <div class="message-content">
-      <div class="thinking-indicator">
-        <div class="thinking-dot"></div>
-        <div class="thinking-dot"></div>
-        <div class="thinking-dot"></div>
+      <div class="message-header">
+        <span class="message-author">Assistant</span>
       </div>
+      <div class="thinking-status" id="thinking-status-text">${state.currentStatus}</div>
     </div>
   `;
   elements.messages.appendChild(thinkingEl);
   scrollToBottom();
 }
 
+function updateStatus(message) {
+  state.currentStatus = message;
+  const statusEl = document.getElementById("thinking-status-text");
+  if (statusEl) {
+    statusEl.textContent = message;
+    statusEl.classList.add("status-update");
+    // Remove the animation class after animation completes
+    setTimeout(() => {
+      if (statusEl) statusEl.classList.remove("status-update");
+    }, 300);
+  }
+  console.log("[STATUS]", message);
+}
+
 function removeThinking() {
   const thinking = document.getElementById("thinking-indicator");
   if (thinking) thinking.remove();
+  state.currentStatus = "";
 }
 
 function handleMessageAction(e) {

@@ -533,7 +533,36 @@ body {
   font-weight: 600;
 }
 
-/* Thinking/Loading Indicator */
+/* Thinking/Loading Status Text */
+.thinking-status {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  padding: 0.5rem 0;
+  transition: all 0.3s ease;
+}
+
+.status-update {
+  animation: statusPulse 0.3s ease;
+}
+
+@keyframes statusPulse {
+  0% {
+    opacity: 0.7;
+    transform: translateX(-2px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Old thinking indicator (dots) - keeping for backwards compatibility if needed */
 .thinking-indicator {
   display: flex;
   gap: 0.25rem;
