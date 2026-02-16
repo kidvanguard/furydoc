@@ -107,21 +107,22 @@ async function handleSearch(request, env) {
     let esQuery;
 
     if (filename) {
-      // If filename is specified, filter by it
+      // If filename is specified, use exact match on filename
+      // and only search content (not filename field to avoid cross-contamination)
       esQuery = {
         query: {
           bool: {
             must: {
               multi_match: {
                 query: query,
-                fields: ["attachment.content^3", "filename", "speaker"],
+                fields: ["attachment.content^3", "speaker"],
                 type: "best_fields",
                 fuzziness: "AUTO",
               },
             },
             filter: {
-              wildcard: {
-                filename: `*${filename}*`,
+              match: {
+                filename: filename,
               },
             },
           },

@@ -10,15 +10,16 @@ export const TIMECODE_AGENT_PROMPT = `You are a documentary researcher analyzing
 YOUR TASK: Extract quotes that are DIRECTLY RELEVANT to the user's query and organize them by theme.
 
 CRITICAL RULES:
-1. **PERSON FILTERING IS MANDATORY**: If the user asks for quotes from a specific person (e.g., "quotes from Sage", "trailer quotes from John"), ONLY include quotes from that person. IGNORE all quotes from other people, even if they are relevant to the topic.
-2. ONLY INCLUDE QUOTES THAT HAVE EMOTIONAL IMPACT - even if they do not use exact keywords from the query - Look for quotes that reveal character depth, show vulnerability, or tell compelling stories. The best quotes often surprise you.
-3. EXCLUDE: interviewer questions (the person asking questions is NOT the interview subject), introductions ("I'm 28"), small talk ("How are you?"), technical checks ("Is the mic on?"), and any content not directly related to the query topic.
-4. ONLY extract quotes from the INTERVIEW SUBJECT (the person being interviewed), NOT from the interviewer asking questions.
-5. **LIMIT OUTPUT**: Return 5-10 of the BEST quotes maximum. Quality over quantity. Choose the most emotionally impactful, trailer-worthy quotes.
-6. FULL QUOTES - Include complete sentences and thoughts that are on-topic.
-7. USE EXACT TIMESTAMPS FROM TRANSCRIPT - The transcript shows timestamps like "Filename | 00:00:00.001 – 00:00:01.760". You MUST copy these exact timestamps in your response. NEVER use "00:00:00 – 00:00:00".
-8. NO "Filename:" label - Use: - Filename | Time: "quote"
-9. Group by theme first, then by person under each theme.
+1. **NEVER FABRICATE QUOTES**: If the provided transcript does NOT contain content relevant to the query, you MUST state: "No relevant quotes found in this transcript." Do NOT invent quotes, timestamps, or content that doesn't exist.
+2. **PERSON FILTERING IS MANDATORY**: If the user asks for quotes from a specific person (e.g., "quotes from Sage", "trailer quotes from John"), ONLY include quotes from that person. IGNORE all quotes from other people, even if they are relevant to the topic.
+3. ONLY INCLUDE QUOTES THAT HAVE EMOTIONAL IMPACT - even if they do not use exact keywords from the query - Look for quotes that reveal character depth, show vulnerability, or tell compelling stories. The best quotes often surprise you.
+4. EXCLUDE: interviewer questions (the person asking questions is NOT the interview subject), introductions ("I'm 28"), small talk ("How are you?"), technical checks ("Is the mic on?"), and any content not directly related to the query topic.
+5. ONLY extract quotes from the INTERVIEW SUBJECT (the person being interviewed), NOT from the interviewer asking questions.
+6. **LIMIT OUTPUT**: Return 5-10 of the BEST quotes maximum. Quality over quantity. Choose the most emotionally impactful, trailer-worthy quotes.
+7. FULL QUOTES - Include complete sentences and thoughts that are on-topic.
+8. USE EXACT TIMESTAMPS FROM TRANSCRIPT - The transcript shows timestamps like "Filename | 00:00:00.001 – 00:00:01.760". You MUST copy these exact timestamps in your response. NEVER use "00:00:00 – 00:00:00".
+9. NO "Filename:" label - Use: - Filename | Time: "quote"
+10. Group by theme first, then by person under each theme.
 
 OUTPUT FORMAT:
 
@@ -35,6 +36,10 @@ Brief context about this theme.
 EXAMPLE:
 If the query is "career sacrifices from Shivam" and transcript shows relevant content at "Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760", your output should be:
 - Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760: "quote about sacrifices here"
+
+IF NO RELEVANT CONTENT EXISTS:
+If the transcript doesn't contain quotes matching the query, respond with:
+"No relevant quotes found in this transcript for [query topic]. The transcript does not contain content about [specific topic/person requested]."
 
 PERSON FILTERING EXAMPLES:
 - Query: "trailer quotes from Sage" → ONLY include quotes from Sage Matthews, exclude all other wrestlers
@@ -56,10 +61,13 @@ EXCLUDE:
 - Weather reports, event logistics, technical problems
 - Empty pleasantries and standalone agreement words
 - Repetitive statements that don't add new information
+- ANY fabricated or invented quotes that don't appear in the transcript
 
 WHEN IN DOUBT ABOUT PERSON: If the speaker name doesn't match the requested person, EXCLUDE the quote.
 
-REMEMBER: The user wants COMPELLING quotes that reveal something true about the person. Return 5-10 best quotes, not 30+ mediocre ones.`;
+WHEN CONTENT IS MISSING: If you cannot find quotes matching the query, admit it. Never make up quotes to satisfy the request.
+
+REMEMBER: The user wants COMPELLING quotes that reveal something true about the person. Return 5-10 best quotes, not 30+ mediocre ones. If no good quotes exist, say so clearly.`;
 
 /**
  * Prompt for planning search queries based on user's research question
@@ -199,6 +207,11 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
     prompt += `- Format: - **Filename** | \`timestamp\`: "Quote"\n\n`;
   } else {
     prompt += `=== QUOTE SELECTION CRITERIA ===\n\n`;
+    prompt += `⚠️  CRITICAL - ANTI-HALLUCINATION RULES:\n`;
+    prompt += `- ONLY extract quotes that EXIST in the provided transcript content below\n`;
+    prompt += `- NEVER invent quotes, timestamps, or attribute quotes to people not in the transcript\n`;
+    prompt += `- If no relevant quotes exist, respond: "No relevant quotes found for [query]."\n`;
+    prompt += `- Only include content that matches the query topic\n\n`;
     prompt += `GOOD QUOTES SHOW:\n`;
     prompt += `- Personal stories with emotional depth (struggles, triumphs, revelations)\n`;
     prompt += `- Specific moments and details (not generic statements)\n`;
@@ -210,7 +223,8 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
     prompt += `- Interviewer questions (only extract quotes from the person BEING interviewed)\n`;
     prompt += `- Technical checks: "Can you hear me?" / "Is this on?" / "Testing one two"\n`;
     prompt += `- Empty agreements: standalone "Yeah" / "Sure" / "Okay" / "Right"\n`;
-    prompt += `- Repetition: Same idea rephrased multiple times\n\n`;
+    prompt += `- Repetition: Same idea rephrased multiple times\n`;
+    prompt += `- ANY content not present in the transcript below\n\n`;
     prompt += `INCLUDE THESE IF THEY TELL A STORY:\n`;
     prompt += `- Introductions that reveal something unique (not just name/age)\n`;
     prompt += `- Job titles IF they explain the meaning behind the role\n`;
@@ -223,7 +237,7 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
     prompt += `✅ STRONG: "I was forced to watch wrestling since I was two... It feels like wrestling is a big part of our family times." (specific memory, emotional connection)\n\n`;
     prompt += `=== SELECTION GUIDELINES ===\n`;
     prompt += `• Return 5-10 of the BEST quotes maximum - quality over quantity\n`;
-    prompt += `• If the file has limited content, return what you find with a note\n`;
+    prompt += `• If no relevant content exists, say so clearly - DO NOT invent quotes\n`;
     prompt += `• Combine adjacent moments to build complete thoughts\n`;
     prompt += `• Prioritize quotes with emotional resonance and specific details\n`;
     prompt += `• If a specific person was requested, ONLY include quotes from that person\n\n`;
@@ -451,6 +465,11 @@ export function buildChunkCombinationPrompt(query, chunkResults, totalChunks) {
 
 QUERY: "${query}"
 
+⚠️  CRITICAL ANTI-HALLUCINATION RULE:
+- ONLY use quotes that appear in the PART results below
+- NEVER invent new quotes, timestamps, or attribute quotes to people not mentioned
+- If no relevant quotes exist across all parts, state: "No relevant quotes found"
+
 Below are the relevant quotes found from each part of the transcript. Your task is to:
 1. Combine and deduplicate similar quotes
 2. Organize ALL unique quotes by theme
@@ -470,8 +489,10 @@ Provide a comprehensive response that:
 - Uses the exact format: **Person Name** followed by bullet points with Filename | Time: "Quote"
 - Includes ALL unique quotes found across all parts
 - Maintains the original timestamps and filenames
+- Does NOT invent any new quotes or content
 
-If the same quote appears multiple times, include it only once.`;
+If the same quote appears multiple times, include it only once.
+If no quotes exist for this query across all parts, say so clearly.`;
 
   return prompt;
 }
