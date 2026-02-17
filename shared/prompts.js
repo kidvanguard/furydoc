@@ -11,15 +11,36 @@ YOUR TASK: Extract quotes that are DIRECTLY RELEVANT to the user's query and org
 
 CRITICAL RULES:
 1. **NEVER FABRICATE QUOTES**: If the provided transcript does NOT contain content relevant to the query, you MUST state: "No relevant quotes found in this transcript." Do NOT invent quotes, timestamps, or content that doesn't exist.
-2. **PERSON FILTERING IS MANDATORY**: If the user asks for quotes from a specific person (e.g., "quotes from Sage", "trailer quotes from John"), ONLY include quotes from that person. IGNORE all quotes from other people, even if they are relevant to the topic.
-3. ONLY INCLUDE QUOTES THAT HAVE EMOTIONAL IMPACT - even if they do not use exact keywords from the query - Look for quotes that reveal character depth, show vulnerability, or tell compelling stories. The best quotes often surprise you.
-4. EXCLUDE: interviewer questions (the person asking questions is NOT the interview subject), introductions ("I'm 28"), small talk ("How are you?"), technical checks ("Is the mic on?"), and any content not directly related to the query topic.
-5. ONLY extract quotes from the INTERVIEW SUBJECT (the person being interviewed), NOT from the interviewer asking questions.
-6. **LIMIT OUTPUT**: Return 5-10 of the BEST quotes maximum. Quality over quantity. Choose the most emotionally impactful, trailer-worthy quotes.
-7. FULL QUOTES - Include complete sentences and thoughts that are on-topic.
-8. USE EXACT TIMESTAMPS FROM TRANSCRIPT - The transcript shows timestamps like "Filename | 00:00:00.001 – 00:00:01.760". You MUST copy these exact timestamps in your response. NEVER use "00:00:00 – 00:00:00".
-9. NO "Filename:" label - Use: - Filename | Time: "quote"
-10. Group by theme first, then by person under each theme.
+
+2. **PERSON FILTERING IS MANDATORY**: 
+   - If the user asks for quotes FROM a specific person (e.g., "quotes from Sage", "trailer quotes from John"), ONLY include quotes where that person is the SPEAKER. IGNORE quotes from other speakers.
+   - If the user asks for quotes ABOUT a specific person/subject (e.g., "people talking about Pumi", "quotes about Sunny"), ONLY include quotes where:
+     a) The subject is EXPLICITLY MENTIONED by name in the quote, OR
+     b) The quote clearly discusses the subject's actions, role, or impact
+     c) The speaker is someone OTHER than the subject themselves
+   - NEVER include quotes FROM a person when the query asks for quotes ABOUT that person from OTHERS.
+
+3. **STRICT SUBJECT VERIFICATION**: For each quote you consider, you MUST verify:
+   - Does this quote actually mention the subject by name OR clearly discuss them?
+   - If the subject is not mentioned in the quote text, EXCLUDE it.
+   - Example: Query "people talking about Pumi" → Quote "I'm the owner" from Pumi should be EXCLUDED (Pumi talking about himself, not others talking about Pumi).
+   - Example: Query "people talking about Pumi" → Quote "Pumi, you know, he wasn't really sure about the fire code" from Jake should be INCLUDED (others talking about Pumi).
+
+4. ONLY INCLUDE QUOTES THAT HAVE EMOTIONAL IMPACT - even if they do not use exact keywords from the query - Look for quotes that reveal character depth, show vulnerability, or tell compelling stories. The best quotes often surprise you.
+
+5. EXCLUDE: interviewer questions (the person asking questions is NOT the interview subject), introductions ("I'm 28"), small talk ("How are you?"), technical checks ("Is the mic on?"), and any content not directly related to the query topic.
+
+6. ONLY extract quotes from the INTERVIEW SUBJECT (the person being interviewed), NOT from the interviewer asking questions.
+
+7. **LIMIT OUTPUT**: Return 5-10 of the BEST quotes maximum. Quality over quantity. Choose the most emotionally impactful, trailer-worthy quotes.
+
+8. FULL QUOTES - Include complete sentences and thoughts that are on-topic.
+
+9. USE EXACT TIMESTAMPS FROM TRANSCRIPT - The transcript shows timestamps like "Filename | 00:00:00.001 – 00:00:01.760". You MUST copy these exact timestamps in your response. NEVER use "00:00:00 – 00:00:00".
+
+10. NO "Filename:" label - Use: - Filename | Time: "quote"
+
+11. Group by theme first, then by person under each theme.
 
 OUTPUT FORMAT:
 
@@ -33,18 +54,28 @@ Brief context about this theme.
 **Another Person** (only if query asks for multiple people)
 - Filename | Time: "Quote"
 
-EXAMPLE:
-If the query is "career sacrifices from Shivam" and transcript shows relevant content at "Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760", your output should be:
+EXAMPLE 1 - Quotes FROM a person:
+Query: "career sacrifices from Shivam" 
+Output: Only quotes where Shivam is the SPEAKER and talking about sacrifices.
 - Shivam Interview A Roll | 00:00:00.001 – 00:00:01.760: "quote about sacrifices here"
+
+EXAMPLE 2 - Quotes ABOUT a person (from others):
+Query: "people talking about Pumi"
+✅ CORRECT: Include quotes from Jake, Shivam, JJ where they mention "Pumi" by name
+✅ CORRECT: Jake Interview A Roll | 00:04:58.740 – 00:05:07.300: "the setup owner Pumi, you know, he wasn't really sure about the fire code restriction"
+❌ WRONG: Exclude quotes FROM Pumi himself (e.g., "I'm the owner of Setup Thailand")
+❌ WRONG: Exclude quotes that don't mention Pumi at all (e.g., Sunny's Mom talking about Sunny)
 
 IF NO RELEVANT CONTENT EXISTS:
 If the transcript doesn't contain quotes matching the query, respond with:
 "No relevant quotes found in this transcript for [query topic]. The transcript does not contain content about [specific topic/person requested]."
 
-PERSON FILTERING EXAMPLES:
-- Query: "trailer quotes from Sage" → ONLY include quotes from Sage Matthews, exclude all other wrestlers
-- Query: "what did John say about training" → ONLY include quotes from John
+FILTERING EXAMPLES:
+- Query: "trailer quotes from Sage" → ONLY include quotes from Sage Matthews as SPEAKER
+- Query: "what did John say about training" → ONLY include quotes from John as SPEAKER  
 - Query: "quotes about passion" → Can include quotes from multiple people since no specific person was requested
+- Query: "people talking about Pumi" → ONLY include quotes where others mention Pumi by name, EXCLUDE quotes from Pumi himself
+- Query: "others' opinions of Sunny" → ONLY include quotes mentioning Sunny, EXCLUDE quotes from Sunny himself
 
 EMOTIONAL IMPACT CHECK: Before including any quote, ask yourself: "Does this quote have emotional resonance or tell a compelling story?"
 
@@ -57,13 +88,20 @@ INCLUDE quotes that show:
 - Authentic voice and personal perspective
 
 EXCLUDE:
-- Quotes from people other than the requested person (when a specific person is mentioned)
+- Quotes where the subject is not mentioned when query asks for "people talking about [subject]"
+- Quotes FROM the subject when query asks for what OTHERS say ABOUT them
 - Weather reports, event logistics, technical problems
 - Empty pleasantries and standalone agreement words
 - Repetitive statements that don't add new information
 - ANY fabricated or invented quotes that don't appear in the transcript
 
-WHEN IN DOUBT ABOUT PERSON: If the speaker name doesn't match the requested person, EXCLUDE the quote.
+VERIFICATION CHECKLIST (for each quote):
+□ Does this quote actually mention the subject by name or clearly discuss them?
+□ If query asks for "about [person]", is this someone OTHER than that person speaking?
+□ Is this quote emotionally compelling or revealing?
+□ Does this quote actually exist in the transcript (not fabricated)?
+
+WHEN IN DOUBT: Exclude the quote. Better to return fewer accurate quotes than many irrelevant ones.
 
 WHEN CONTENT IS MISSING: If you cannot find quotes matching the query, admit it. Never make up quotes to satisfy the request.
 
@@ -212,6 +250,29 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
     prompt += `- NEVER invent quotes, timestamps, or attribute quotes to people not in the transcript\n`;
     prompt += `- If no relevant quotes exist, respond: "No relevant quotes found for [query]."\n`;
     prompt += `- Only include content that matches the query topic\n\n`;
+
+    // Add subject verification for queries about specific people
+    const aboutPersonMatch = query.match(
+      /(?:about|talking about|talk about)\s+(\w+)/i,
+    );
+    const fromPersonMatch = query.match(/(?:from|by)\s+(\w+)/i);
+
+    if (aboutPersonMatch) {
+      const subject = aboutPersonMatch[1];
+      prompt += `⚠️  CRITICAL - SUBJECT VERIFICATION FOR "${subject}":\n`;
+      prompt += `- This query asks for quotes ABOUT "${subject}" from OTHER people\n`;
+      prompt += `- ONLY include quotes where the speaker EXPLICITLY MENTIONS "${subject}" BY NAME\n`;
+      prompt += `- EXCLUDE any quotes from ${subject} themselves (they cannot talk ABOUT themselves in this context)\n`;
+      prompt += `- EXCLUDE quotes that don't mention "${subject}" at all\n`;
+      prompt += `- Before including ANY quote, verify: Does this quote text actually contain the word "${subject}"?\n\n`;
+    } else if (fromPersonMatch) {
+      const person = fromPersonMatch[1];
+      prompt += `⚠️  CRITICAL - SPEAKER FILTER FOR "${person}":\n`;
+      prompt += `- This query asks for quotes FROM "${person}"\n`;
+      prompt += `- ONLY include quotes where "${person}" is the SPEAKER\n`;
+      prompt += `- EXCLUDE quotes from all other speakers\n\n`;
+    }
+
     prompt += `GOOD QUOTES SHOW:\n`;
     prompt += `- Personal stories with emotional depth (struggles, triumphs, revelations)\n`;
     prompt += `- Specific moments and details (not generic statements)\n`;
@@ -224,7 +285,11 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
     prompt += `- Technical checks: "Can you hear me?" / "Is this on?" / "Testing one two"\n`;
     prompt += `- Empty agreements: standalone "Yeah" / "Sure" / "Okay" / "Right"\n`;
     prompt += `- Repetition: Same idea rephrased multiple times\n`;
-    prompt += `- ANY content not present in the transcript below\n\n`;
+    prompt += `- ANY content not present in the transcript below\n`;
+    if (aboutPersonMatch) {
+      prompt += `- Quotes that do NOT mention "${aboutPersonMatch[1]}" by name\n`;
+    }
+    prompt += `\n`;
     prompt += `INCLUDE THESE IF THEY TELL A STORY:\n`;
     prompt += `- Introductions that reveal something unique (not just name/age)\n`;
     prompt += `- Job titles IF they explain the meaning behind the role\n`;
@@ -235,6 +300,13 @@ export function buildResultsAnalysisPrompt(query, searchResults) {
     prompt += `✅ STRONG: "I have about one million debt when I was 19... I spend from that time until now to prove myself to my parents that I can make this a job." (specific stakes, personal struggle)\n\n`;
     prompt += `❌ WEAK: "Yeah, wrestling is my passion." (generic)\n`;
     prompt += `✅ STRONG: "I was forced to watch wrestling since I was two... It feels like wrestling is a big part of our family times." (specific memory, emotional connection)\n\n`;
+    if (aboutPersonMatch) {
+      const subject = aboutPersonMatch[1];
+      prompt += `QUERY: "people talking about ${subject}"\n\n`;
+      prompt += `❌ WRONG: "I'm the owner of the company." - ${subject} talking about themselves\n`;
+      prompt += `❌ WRONG: "I like training here." - doesn't mention ${subject} at all\n`;
+      prompt += `✅ CORRECT: "${subject}, you know, he really understands wrestling." - others mentioning ${subject} by name\n\n`;
+    }
     prompt += `=== SELECTION GUIDELINES ===\n`;
     prompt += `• Return 5-10 of the BEST quotes maximum - quality over quantity\n`;
     prompt += `• If no relevant content exists, say so clearly - DO NOT invent quotes\n`;
@@ -461,6 +533,11 @@ export function chunkSearchResults(searchResults, maxTokensPerChunk = 100000) {
  * Builds a summary prompt for combining chunk results
  */
 export function buildChunkCombinationPrompt(query, chunkResults, totalChunks) {
+  // Check if this is a query about a specific person
+  const aboutPersonMatch = query.match(
+    /(?:about|talking about|talk about)\s+(\w+)/i,
+  );
+
   let prompt = `You are analyzing a long interview transcript that was split into ${totalChunks} parts due to length.
 
 QUERY: "${query}"
@@ -469,30 +546,49 @@ QUERY: "${query}"
 - ONLY use quotes that appear in the PART results below
 - NEVER invent new quotes, timestamps, or attribute quotes to people not mentioned
 - If no relevant quotes exist across all parts, state: "No relevant quotes found"
+`;
 
-Below are the relevant quotes found from each part of the transcript. Your task is to:
+  // Add subject verification for queries about specific people
+  if (aboutPersonMatch) {
+    const subject = aboutPersonMatch[1];
+    prompt += `\n⚠️  CRITICAL - SUBJECT VERIFICATION FOR "${subject}":\n`;
+    prompt += `- This query asks for quotes ABOUT "${subject}" from OTHER people\n`;
+    prompt += `- ONLY include quotes where the speaker EXPLICITLY MENTIONS "${subject}" BY NAME\n`;
+    prompt += `- EXCLUDE any quotes from ${subject} themselves\n`;
+    prompt += `- EXCLUDE quotes that don't mention "${subject}" at all\n`;
+    prompt += `- When combining results, verify each quote actually contains "${subject}"\n`;
+  }
+
+  prompt += `\nBelow are the relevant quotes found from each part of the transcript. Your task is to:
 1. Combine and deduplicate similar quotes
 2. Organize ALL unique quotes by theme
 3. Ensure each theme flows logically
 4. Include EVERY meaningful quote - don't summarize away the details
-
 `;
+
+  if (aboutPersonMatch) {
+    prompt += `5. FILTER OUT any quotes that don't mention "${aboutPersonMatch[1]}" by name\n`;
+  }
+  prompt += `\n`;
 
   chunkResults.forEach((result, index) => {
     prompt += `\n=== PART ${index + 1} RESULTS ===\n${result}\n`;
   });
 
-  prompt += `\n=== FINAL OUTPUT ===\n
-Provide a comprehensive response that:
-- Groups quotes by theme (e.g., "Struggles and Sacrifices", "Passion and Dreams")
-- Lists quotes under each person
-- Uses the exact format: **Person Name** followed by bullet points with Filename | Time: "Quote"
-- Includes ALL unique quotes found across all parts
-- Maintains the original timestamps and filenames
-- Does NOT invent any new quotes or content
-
-If the same quote appears multiple times, include it only once.
-If no quotes exist for this query across all parts, say so clearly.`;
+  prompt += `\n=== FINAL OUTPUT ===\n\nProvide a comprehensive response that:
+- Groups quotes by theme (e.g., "Struggles and Sacrifices", "Passion and Dreams")\n`;
+  if (aboutPersonMatch) {
+    const subject = aboutPersonMatch[1];
+    prompt += `- ONLY includes quotes where someone OTHER than ${subject} mentions ${subject} by name\n`;
+    prompt += `- EXCLUDES quotes from ${subject} themselves\n`;
+  }
+  prompt += `- Lists quotes under each person\n`;
+  prompt += `- Uses the exact format: **Person Name** followed by bullet points with Filename | Time: "Quote"\n`;
+  prompt += `- Includes ALL unique quotes found across all parts\n`;
+  prompt += `- Maintains the original timestamps and filenames\n`;
+  prompt += `- Does NOT invent any new quotes or content\n\n`;
+  prompt += `If the same quote appears multiple times, include it only once.\n`;
+  prompt += `If no quotes exist for this query across all parts, say so clearly.`;
 
   return prompt;
 }
